@@ -1,14 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	httpstd "net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/rs/zerolog"
-
 	"github.com/upamune/podcast-server/http"
 	"github.com/upamune/podcast-server/podcast"
 )
@@ -56,7 +57,26 @@ func realMain() int {
 		return 1
 	}
 
-	httpstd.ListenAndServe(":3333", handler)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	server := &httpstd.Server{Addr: ":3333", Handler: handler}
+
+	go func() {
+		<-ctx.Done()
+		logger.Info().Msg("shutting down server in 60 seconds")
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			logger.Error().Err(err).Msg("failed to shutdown server")
+			return
+		}
+	}()
+
+	if err := server.ListenAndServe(); err != nil {
+		logger.Error().Err(err).Msg("failed to listen and serve")
+		return 1
+	}
 
 	return 0
 }
