@@ -61,7 +61,7 @@ func NewHTTPHandler(
 	e.GET("/config", func(c echo.Context) error {
 		config := recorder.Config()
 
-		if c.QueryParams().Get("format") == "json" {
+		if accept := c.Request().Header.Get("Accept"); accept == "application/json" || accept == "json" {
 			return c.JSON(http.StatusOK, config)
 		}
 
