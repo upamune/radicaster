@@ -18,6 +18,9 @@ func encodeXML(w io.Writer, p *Podcast) error {
 		p.PublishedAt,
 		&now,
 	)
+	if p.ImageURL != "" {
+		podcast.AddImage(p.ImageURL)
+	}
 	for _, e := range p.Episodes {
 		e := e
 		desc := e.Description
@@ -28,6 +31,9 @@ func encodeXML(w io.Writer, p *Podcast) error {
 			Title:       e.Title,
 			Description: desc,
 			PubDate:     e.PublishedAt,
+		}
+		if e.ImageURL != "" {
+			item.AddImage(e.ImageURL)
 		}
 
 		enclosureType := podcastpkg.M4A

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/upamune/podcast-server/metadata"
 )
 
 type Podcast struct {
@@ -20,6 +21,7 @@ type Podcast struct {
 	Link        string
 	Description string
 	PublishedAt *time.Time
+	ImageURL    string
 
 	Episodes []Episode
 }
@@ -30,6 +32,7 @@ type Episode struct {
 	PublishedAt   *time.Time
 	URL           string
 	LengthInBytes int64
+	ImageURL      string
 }
 
 type Podcaster struct {
@@ -42,6 +45,7 @@ type Podcaster struct {
 	link        string
 	description string
 	publishedAt *time.Time
+	imageURL    string
 
 	mu   *sync.RWMutex
 	feed string
@@ -55,6 +59,7 @@ func NewPodcaster(
 	link string,
 	description string,
 	publishedAt *time.Time,
+	imageURL string,
 ) *Podcaster {
 	p := &Podcaster{
 		logger:      logger,
@@ -64,6 +69,7 @@ func NewPodcaster(
 		link:        link,
 		description: description,
 		publishedAt: publishedAt,
+		imageURL:    imageURL,
 		mu:          &sync.RWMutex{},
 	}
 	return p
@@ -86,6 +92,7 @@ func (p *Podcaster) Sync() error {
 		Link:        p.link,
 		Description: p.description,
 		PublishedAt: p.publishedAt,
+		ImageURL:    p.imageURL,
 	}
 
 	p.logger.Info().Str("target_dir", p.targetDir).Msg("filepath.Walk is starting")
@@ -105,6 +112,11 @@ func (p *Podcaster) Sync() error {
 			return err
 		}
 
+		if filepath.Ext(fpath) == ".json" {
+			p.logger.Info().Str("path", fpath).Msg("skip a json file")
+			return nil
+		}
+
 		baseName := filepath.Base(fpath)
 
 		u, err := url.Parse(p.baseURL)
@@ -120,12 +132,23 @@ func (p *Podcaster) Sync() error {
 		}
 		if ss := strings.Split(baseName, "_"); len(ss) > 1 {
 			ep.Title = ss[0]
-			startedAt, err := time.Parse("200601021504", strings.TrimSuffix(ss[1], filepath.Ext(ss[1])))
-			if err != nil {
-				return err
+			if startedAt, _ := time.Parse("200601021504", strings.TrimSuffix(ss[1], filepath.Ext(ss[1]))); err == nil {
+				ep.PublishedAt = &startedAt
 			}
-			ep.PublishedAt = &startedAt
 		}
+		if ep.PublishedAt == nil {
+			now := time.Now()
+			ep.PublishedAt = &now
+		}
+
+		// NOTE: メタデータがあればそれで全て上書きする
+		if md, err := metadata.ReadByAudioFilePath(fpath); err == nil {
+			ep.Title = md.Title
+			ep.Description = md.Description
+			ep.PublishedAt = &md.PublishedAt
+			ep.ImageURL = md.ImageURL
+		}
+
 		podcast.Episodes = append(podcast.Episodes, ep)
 
 		return nil

@@ -18,6 +18,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/upamune/podcast-server/config"
+	"github.com/upamune/podcast-server/metadata"
 	"github.com/yyoshiki41/go-radiko"
 	"github.com/yyoshiki41/radigo"
 )
@@ -58,16 +59,7 @@ func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string,
 	return r, nil
 }
 
-func parseTime(s string) (time.Time, error) {
-	const layout = "200601021504"
-	t, err := time.ParseInLocation(layout, s, jst)
-	if err != nil {
-		return time.Time{}, errors.Wrap(err, "failed to parse time")
-	}
-	return t, nil
-}
-
-func (r *Recorder) Record(p config.Program) error {
+func (r *Recorder) Record(p config.Program) (err error) {
 	var (
 		taskID          = xid.New().String()
 		taskStartedTime = time.Now()
@@ -79,11 +71,16 @@ func (r *Recorder) Record(p config.Program) error {
 		Msg("record task started")
 	defer func() {
 		taskFinishedTime := time.Now()
-		logger.Info().
+		logger := logger.With().
 			Time("task_started_time", taskStartedTime).
 			Time("task_finished_time", taskFinishedTime).
-			Dur("task_duration", taskFinishedTime.Sub(taskStartedTime)).
-			Msg("record task finished")
+			Dur("task_duration", taskFinishedTime.Sub(taskStartedTime)).Logger()
+
+		if err != nil {
+			logger.Error().Err(err).Msg("record task finished with an error")
+			return
+		}
+		logger.Info().Msg("record task finished")
 	}()
 	ctx := context.Background()
 
@@ -96,9 +93,29 @@ func (r *Recorder) Record(p config.Program) error {
 
 	program, err := r.client.GetProgramByStartTime(ctx, p.StationID, from)
 	if err != nil {
-		return errors.Wrap(err, "failed to get program")
+		return errors.Wrap(
+			err,
+			fmt.Sprintf(
+				"failed to get program: station_id=%s, from=%s",
+				p.StationID,
+				from.Format("2006-01-02 15:04:05"),
+			),
+		)
 	}
 	logger.Info().Time("from", from).Str("program_title", program.Title).Msg("program found")
+
+	fileName := fmt.Sprintf(
+		"%s_%s.%s",
+		program.Title,
+		from.Format("2006年01月02日"),
+		p.Encoding,
+	)
+	output := filepath.Join(r.targetDir, fileName)
+
+	if _, err := os.Stat(output); err == nil {
+		logger.Info().Str("output", output).Msg("file already exists")
+		return nil
+	}
 
 	uri, err := r.client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
 	if err != nil {
@@ -121,7 +138,7 @@ func (r *Recorder) Record(p config.Program) error {
 	var concatedFile string
 	if iterCount, _, err := lo.AttemptWithDelay(
 		10,
-		3*time.Second,
+		10*time.Second,
 		func(i int, dur time.Duration) error {
 			var err error
 			logger.Info().Dur("duration", dur).Int("iter_count", i).Msg("concating aac files")
@@ -134,15 +151,6 @@ func (r *Recorder) Record(p config.Program) error {
 		return errors.Wrapf(err, "failed to concat aac files after %d times", iterCount)
 	}
 	logger.Info().Msg("finished concating aac files")
-
-	fileName := fmt.Sprintf(
-		"%s_%s.%s",
-		program.Title,
-		from.Format("2006年01月02日"),
-		p.Encoding,
-	)
-
-	output := filepath.Join(r.targetDir, fileName)
 
 	switch p.Encoding {
 	case config.AudioFormatAAC:
@@ -176,6 +184,18 @@ func (r *Recorder) Record(p config.Program) error {
 		logger.Info().Msg("finish converting aac to mp3")
 	default:
 		return errors.Errorf("unsupported encoding: %s", p.Encoding)
+	}
+
+	if err := metadata.WriteByAudioFilePath(
+		output,
+		metadata.EpisodeMetadata{
+			Title:       program.Title,
+			Description: program.Desc,
+			PublishedAt: from,
+			ImageURL:    p.ImageURL,
+		},
+	); err != nil {
+		return errors.Wrap(err, "failed to write metadata")
 	}
 
 	return nil
@@ -247,6 +267,8 @@ func (r *Recorder) Config() config.Config {
 }
 
 func (r *Recorder) refreshConfig(config config.Config) (config.Config, error) {
+	r.logger.Info().Msg("start refreshing config")
+	defer r.logger.Info().Msg("finish refreshing config")
 	r.config.Lock()
 	r.config.Config = config
 	r.logger.Debug().Object("config", config).Msg("config updated")

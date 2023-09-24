@@ -1,5 +1,11 @@
 # podcast-server
 
+## Warning!!
+
+```bash
+$ ulimit -n 16384
+```
+
 ## Usage
 
 ```bash

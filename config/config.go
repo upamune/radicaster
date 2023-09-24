@@ -25,6 +25,7 @@ type Program struct {
 	StationID string `yaml:"station" json:"station"`
 	Start     string `yaml:"start" json:"start"`
 	Encoding  string `yaml:"encoding,omitempty" json:"encoding,omitempty"`
+	ImageURL  string `yaml:"image_url,omitempty" json:"image_url,omitempty"`
 }
 
 func Parse(r io.Reader) (Config, error) {
@@ -72,7 +73,8 @@ func (p Program) MarshalZerologObject(e *zerolog.Event) {
 	e.Str("cron", p.Cron).
 		Str("station_id", p.StationID).
 		Str("start", p.Start).
-		Str("encoding", p.Encoding)
+		Str("encoding", p.Encoding).
+		Str("image_url", p.ImageURL)
 }
 
 type Programs []Program

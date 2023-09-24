@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 	"github.com/upamune/podcast-server/config"
 	"github.com/upamune/podcast-server/http"
@@ -27,6 +28,7 @@ func realMain() int {
 	basicAuth := flag.String("basicauth", "", "basic auth for HTTP server")
 	programConfig := flag.String("config", "./radicast.yaml", "path for config")
 	programConfigURL := flag.String("configurl", "", "url for config")
+	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
 	flag.Parse()
 
 	if baseURL == nil || *baseURL == "" {
@@ -41,21 +43,64 @@ func realMain() int {
 
 	logger := zerolog.New(os.Stderr)
 
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create file watcher")
+		return 1
+	}
+	defer watcher.Close()
+
 	now := time.Now()
 	podcaster := podcast.NewPodcaster(
 		logger,
 		*baseURL,
 		*targetDir,
-		"Radiko",
+		"Radicaster",
 		*baseURL,
-		"Radiko",
+		"Radicaster",
 		&now,
+		*podcastImageURL,
 	)
 
 	if err := podcaster.Sync(); err != nil {
 		logger.Error().Err(err).Msg("failed to initial sync")
 		return 1
 	}
+
+	go func() {
+		logger := logger.With().Str("component", "file_watcher").Logger()
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				logger.Info().
+					Str("event_name", event.Name).
+					Str("event_operator", event.Op.String()).
+					Msg("got a file event")
+
+				if event.Has(fsnotify.Chmod) {
+					continue
+				}
+				if err := podcaster.Sync(); err != nil {
+					logger.Error().Err(err).Msg("failed to sync")
+					continue
+				}
+				logger.Info().Msg("synced")
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				logger.Error().Err(err).Msg("got a file watcher error")
+			}
+		}
+	}()
+	if err := watcher.Add(*targetDir); err != nil {
+		logger.Error().Err(err).Msg("failed to add file watcher")
+		return 1
+	}
+	logger.Info().Str("target_dir", *targetDir).Msg("added file watcher for sync")
 
 	initConfig, err := config.Init(programConfig, programConfigURL)
 	if err != nil {
