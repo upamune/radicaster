@@ -13,6 +13,9 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/go-co-op/gocron"
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/rs/xid"
+	"github.com/rs/zerolog"
+	"github.com/samber/lo"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/upamune/podcast-server/config"
 	"github.com/yyoshiki41/go-radiko"
@@ -24,6 +27,7 @@ var jst = time.FixedZone("Asia/Tokyo", 9*60*60)
 type Recorder struct {
 	httpClient *retryablehttp.Client
 	client     *radiko.Client
+	logger     zerolog.Logger
 
 	targetDir string
 
@@ -38,10 +42,11 @@ type Recorder struct {
 	}
 }
 
-func NewRecorder(client *radiko.Client, targetDir string, initConfig config.Config) (*Recorder, error) {
+func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string, initConfig config.Config) (*Recorder, error) {
 	r := &Recorder{
 		client:     client,
 		httpClient: retryablehttp.NewClient(),
+		logger:     logger,
 		targetDir:  targetDir,
 	}
 	r.config.Config = initConfig
@@ -63,6 +68,23 @@ func parseTime(s string) (time.Time, error) {
 }
 
 func (r *Recorder) Record(p config.Program) error {
+	var (
+		taskID          = xid.New().String()
+		taskStartedTime = time.Now()
+		logger          = r.logger.With().Str("task_id", taskID).Logger()
+	)
+
+	logger.Info().
+		Time("task_started_time", taskStartedTime).
+		Msg("record task started")
+	defer func() {
+		taskFinishedTime := time.Now()
+		logger.Info().
+			Time("task_started_time", taskStartedTime).
+			Time("task_finished_time", taskFinishedTime).
+			Dur("task_duration", taskFinishedTime.Sub(taskStartedTime)).
+			Msg("record task finished")
+	}()
 	ctx := context.Background()
 
 	from, err := parseTime(p.Start)
@@ -74,6 +96,7 @@ func (r *Recorder) Record(p config.Program) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get program")
 	}
+	logger.Info().Str("program_title", program.Title).Msg("program found")
 
 	uri, err := r.client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
 	if err != nil {
@@ -92,23 +115,67 @@ func (r *Recorder) Record(p config.Program) error {
 		return errors.Wrap(err, "failed to download aac files")
 	}
 
-	// TODO: retry
-	concatedFile, err := radigo.ConcatAACFilesFromList(ctx, aacDir)
-	if err != nil {
-		return errors.Wrap(err, "failed to concat aac files")
+	logger.Info().Msg("start concating aac files")
+	var concatedFile string
+	if iterCount, _, err := lo.AttemptWithDelay(
+		10,
+		3*time.Second,
+		func(i int, dur time.Duration) error {
+			var err error
+			logger.Info().Dur("duration", dur).Int("iter_count", i).Msg("concating aac files")
+			concatedFile, err = radigo.ConcatAACFilesFromList(ctx, aacDir)
+			if err != nil {
+				return errors.Wrap(err, "failed to concat aac files")
+			}
+			return nil
+		}); err != nil {
+		return errors.Wrapf(err, "failed to concat aac files after %d times", iterCount)
 	}
+	logger.Info().Msg("finished concating aac files")
 
 	fileName := fmt.Sprintf(
-		"%s_%s.mp3",
+		"%s_%s.%s",
 		program.Title,
 		from.Format("2006年01月02日"),
+		p.Encoding,
 	)
 
 	output := filepath.Join(r.targetDir, fileName)
-	// TODO: retry
-	if err := radigo.ConvertAACtoMP3(ctx, concatedFile, output); err != nil {
-		return errors.Wrap(err, "failed to convert aac to mp3")
+
+	switch p.Encoding {
+	case config.AudioFormatAAC:
+		logger.Info().
+			Str("output", output).
+			Msg("start outputting aac")
+		absPath, err := filepath.Abs(output)
+		if err != nil {
+			return errors.Wrap(err, "failed to get abs path")
+		}
+		if err := os.Rename(concatedFile, absPath); err != nil {
+			return errors.Wrap(err, "failed to rename file")
+		}
+		logger.Info().Msg("finish outputting aac")
+	case config.AudioFormatMP3:
+		logger.Info().
+			Str("output", output).
+			Msg("start converting aac to mp3")
+		if iterCount, _, err := lo.AttemptWithDelay(
+			10,
+			3*time.Second,
+			func(i int, dur time.Duration) error {
+				logger.Info().Dur("duration", dur).Int("iter_count", i).Msg("converting aac to mp3")
+				if err := radigo.ConvertAACtoMP3(ctx, concatedFile, output); err != nil {
+					return errors.Wrap(err, "failed to convert aac to mp3")
+				}
+				return nil
+			}); err != nil {
+			return errors.Wrapf(err, "failed to convert aac to mp3 after %d times", iterCount)
+		}
+		logger.Info().Msg("finish converting aac to mp3")
+	default:
+		return errors.Errorf("unsupported encoding: %s", p.Encoding)
 	}
+
 	return nil
 }
 
@@ -185,6 +252,7 @@ func (r *Recorder) RefreshConfig(configURL string) error {
 
 	r.config.Lock()
 	r.config.Config = config
+	r.logger.Debug().Object("config", config).Msg("config updated")
 	r.config.Unlock()
 
 	if err := r.restartScheduler(); err != nil {
