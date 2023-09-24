@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/rs/zerolog"
@@ -61,8 +62,19 @@ func NewHTTPHandler(
 	e.GET("/config", func(c echo.Context) error {
 		config := recorder.Config()
 
-		if accept := c.Request().Header.Get("Accept"); accept == "application/json" || accept == "json" {
+		acceptHeader := c.Request().Header.Get("Accept")
+		if acceptHeader == "application/json" || acceptHeader == "json" {
 			return c.JSON(http.StatusOK, config)
+		}
+
+		if acceptHeader == "application/yaml" || acceptHeader == "yaml" {
+			var buf bytes.Buffer
+			if err := yaml.
+				NewEncoder(&buf, yaml.Indent(2)).
+				Encode(config); err != nil {
+				return c.String(http.StatusInternalServerError, err.Error())
+			}
+			return c.Blob(http.StatusOK, "application/yaml", buf.Bytes())
 		}
 
 		var buf bytes.Buffer
@@ -95,6 +107,17 @@ func NewHTTPHandler(
 		updatedConfig, err := recorder.RefreshConfig(c)
 		if err != nil {
 			return ctx.String(http.StatusInternalServerError, err.Error())
+		}
+
+		acceptHeader := ctx.Request().Header.Get("Accept")
+		if acceptHeader == "application/yaml" || acceptHeader == "yaml" {
+			var buf bytes.Buffer
+			if err := yaml.
+				NewEncoder(&buf, yaml.Indent(2)).
+				Encode(updatedConfig); err != nil {
+				return ctx.String(http.StatusInternalServerError, err.Error())
+			}
+			return ctx.Blob(http.StatusOK, "application/yaml", buf.Bytes())
 		}
 
 		return ctx.JSON(http.StatusOK, updatedConfig)
