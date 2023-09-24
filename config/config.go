@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"io"
+	"net/http"
+	"os"
 
 	"github.com/cockroachdb/errors"
 	"github.com/goccy/go-yaml"
@@ -14,14 +17,14 @@ const (
 )
 
 type Config struct {
-	Programs []Program `yaml:"programs"`
+	Programs []Program `yaml:"programs" json:"programs"`
 }
 
 type Program struct {
-	Cron      string `yaml:"cron"`
-	StationID string `yaml:"station_id"`
-	Start     string `yaml:"start"`
-	Encoding  string `yaml:"encoding,omitempty"`
+	Cron      string `yaml:"cron" json:"cron"`
+	StationID string `yaml:"station" json:"station"`
+	Start     string `yaml:"start" json:"start"`
+	Encoding  string `yaml:"encoding,omitempty" json:"encoding,omitempty"`
 }
 
 func Parse(r io.Reader) (Config, error) {
@@ -35,6 +38,34 @@ func Parse(r io.Reader) (Config, error) {
 		}
 	}
 	return c, nil
+}
+
+func Init(configFilePath *string, configURL *string) (Config, error) {
+	if configFilePath != nil {
+		f, err := os.Open(*configFilePath)
+		if err != nil {
+			return Config{}, errors.Wrap(err, "failed to open config file")
+		}
+		defer f.Close()
+		return Parse(f)
+	}
+
+	if configURL != nil {
+		resp, err := http.Get(*configURL)
+		if err != nil {
+			return Config{}, errors.Wrap(
+				err,
+				fmt.Sprintf("failed to get config file: %s", *configURL),
+			)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return Config{}, errors.Newf("status code is not 200: %d", resp.StatusCode)
+		}
+		return Parse(resp.Body)
+	}
+
+	return Config{}, nil
 }
 
 func (p Program) MarshalZerologObject(e *zerolog.Event) {

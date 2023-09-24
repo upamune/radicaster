@@ -1,0 +1,37 @@
+<html>
+    <head>
+        <title>Radicast - Config</title>
+        <link rel="stylesheet" href="https://unpkg.com/awsm.css/dist/awsm.min.css">
+    </head>
+    <body>
+        <header>
+            <h2>Current Config</h2>
+        </header>
+        <main>
+            <article>
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Index</th>
+                            <th scope="col">Cron</th>
+                            <th scope="col">Station</th>
+                            <th scope="col">Start</th>
+                            <th scope="col">Encoding</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range $i, $p := .Programs }}
+                        <tr>
+                          <td>{{ inc $i }}</td>
+                          <td>{{ $p.Cron }}</td>
+                          <td>{{ $p.StationID }}</td>
+                          <td>{{ $p.Start }}</td>
+                          <td>{{ $p.Encoding }}</td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </article>
+        </main>
+    </body>
+</html>

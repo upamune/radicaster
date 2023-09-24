@@ -87,16 +87,18 @@ func (r *Recorder) Record(p config.Program) error {
 	}()
 	ctx := context.Background()
 
-	from, err := parseTime(p.Start)
-	if err != nil {
-		return errors.Wrap(err, "failed to parse from")
-	}
+	today := time.Now().In(jst)
+	from, err := time.ParseInLocation(
+		"200601021504",
+		fmt.Sprintf("%d%02d%02d%s", today.Year(), today.Month(), today.Day(), p.Start),
+		jst,
+	)
 
 	program, err := r.client.GetProgramByStartTime(ctx, p.StationID, from)
 	if err != nil {
 		return errors.Wrap(err, "failed to get program")
 	}
-	logger.Info().Str("program_title", program.Title).Msg("program found")
+	logger.Info().Time("from", from).Str("program_title", program.Title).Msg("program found")
 
 	uri, err := r.client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
 	if err != nil {
@@ -238,26 +240,40 @@ func (r *Recorder) restartScheduler() error {
 	return nil
 }
 
-func (r *Recorder) RefreshConfig(configURL string) error {
-	resp, err := http.Get(configURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to get config via URL")
-	}
-	defer resp.Body.Close()
+func (r *Recorder) Config() config.Config {
+	r.config.RLock()
+	defer r.config.RUnlock()
+	return r.config.Config
+}
 
-	config, err := config.Parse(resp.Body)
-	if err != nil {
-		return errors.Wrap(err, "failed to parse config")
-	}
-
+func (r *Recorder) refreshConfig(config config.Config) (config.Config, error) {
 	r.config.Lock()
 	r.config.Config = config
 	r.logger.Debug().Object("config", config).Msg("config updated")
 	r.config.Unlock()
 
 	if err := r.restartScheduler(); err != nil {
-		return errors.Wrap(err, "failed to update scheduler")
+		return config, errors.Wrap(err, "failed to update scheduler")
 	}
 
-	return nil
+	return config, nil
+}
+
+func (r *Recorder) RefreshConfig(config config.Config) (config.Config, error) {
+	return r.refreshConfig(config)
+}
+
+func (r *Recorder) RefreshConfigByURL(configURL string) (config.Config, error) {
+	resp, err := http.Get(configURL)
+	if err != nil {
+		return config.Config{}, errors.Wrap(err, "failed to get config via URL")
+	}
+	defer resp.Body.Close()
+
+	config, err := config.Parse(resp.Body)
+	if err != nil {
+		return config, errors.Wrap(err, "failed to parse config")
+	}
+
+	return r.refreshConfig(config)
 }

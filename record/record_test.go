@@ -2,7 +2,6 @@ package record
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -30,11 +29,10 @@ func TestNewRecord(t *testing.T) {
 		t.Fatalf("%+v\n", errors.WithStack(err))
 	}
 
-	startTime := time.Now().AddDate(0, 0, -1).Format("20060102")
 	if err := r.Record(config.Program{
 		Cron:      "",
 		StationID: "LFR",
-		Start:     fmt.Sprintf("%s0300", startTime),
+		Start:     "0300",
 		Encoding:  config.AudioFormatAAC,
 	}); err != nil {
 		t.Fatalf("%+v\n", errors.WithStack(err))

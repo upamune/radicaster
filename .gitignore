@@ -1,6 +1,8 @@
 /dist
 /output
+/tmp
 .DS_Store
+radicast.yaml
 
 *.aac
 *.mp3
