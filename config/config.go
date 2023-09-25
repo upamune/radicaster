@@ -9,6 +9,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog"
+	"github.com/upamune/podcast-server/timeutil"
 )
 
 const (
@@ -21,11 +22,12 @@ type Config struct {
 }
 
 type Program struct {
-	Cron      string `yaml:"cron" json:"cron"`
-	StationID string `yaml:"station" json:"station"`
-	Start     string `yaml:"start" json:"start"`
-	Encoding  string `yaml:"encoding,omitempty" json:"encoding,omitempty"`
-	ImageURL  string `yaml:"image_url,omitempty" json:"image_url,omitempty"`
+	Weekdays  []timeutil.Weekday `yaml:"weekdays" json:"weekdays"`
+	Cron      string             `yaml:"cron" json:"cron"`
+	StationID string             `yaml:"station" json:"station"`
+	Start     string             `yaml:"start" json:"start"`
+	Encoding  string             `yaml:"encoding,omitempty" json:"encoding,omitempty"`
+	ImageURL  string             `yaml:"image_url,omitempty" json:"image_url,omitempty"`
 }
 
 func Parse(r io.Reader) (Config, error) {

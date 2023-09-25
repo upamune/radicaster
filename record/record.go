@@ -19,11 +19,10 @@ import (
 	"github.com/sourcegraph/conc/pool"
 	"github.com/upamune/podcast-server/config"
 	"github.com/upamune/podcast-server/metadata"
+	"github.com/upamune/podcast-server/timeutil"
 	"github.com/yyoshiki41/go-radiko"
 	"github.com/yyoshiki41/radigo"
 )
-
-var jst = time.FixedZone("Asia/Tokyo", 9*60*60)
 
 type Recorder struct {
 	httpClient *retryablehttp.Client
@@ -61,9 +60,8 @@ func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string,
 
 func (r *Recorder) Record(p config.Program) (err error) {
 	var (
-		taskID          = xid.New().String()
 		taskStartedTime = time.Now()
-		logger          = r.logger.With().Str("task_id", taskID).Logger()
+		logger          = r.logger.With().Str("task_id", xid.New().String()).Logger()
 	)
 
 	logger.Info().
@@ -83,13 +81,40 @@ func (r *Recorder) Record(p config.Program) (err error) {
 		logger.Info().Msg("record task finished")
 	}()
 	ctx := context.Background()
+	now := time.Now().In(timeutil.JST())
+	pl := pool.New().WithErrors().WithMaxGoroutines(1)
+	for _, weekday := range lo.Uniq(p.Weekdays) {
+		weekday := weekday
+		pl.Go(func() error {
+			if err := r.record(ctx, logger, now, weekday, p); err != nil {
+				return errors.Wrap(err, "failed to record")
+			}
+			return nil
+		})
+	}
+	if err := pl.Wait(); err != nil {
+		return errors.Wrap(err, "failed to wait for all goroutines")
+	}
 
-	today := time.Now().In(jst)
+	return nil
+}
+
+func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.Time, weekday timeutil.Weekday, p config.Program) error {
+	logger = logger.With().Str("weekday", weekday.String()).Str("sub_task_id", xid.New().String()).Logger()
+
+	targetDay, err := timeutil.LastSpecifiedWeekday(weekday, now)
+	if err != nil {
+		return errors.Wrap(err, "failed to get last specified weekday")
+	}
+
 	from, err := time.ParseInLocation(
 		"200601021504",
-		fmt.Sprintf("%d%02d%02d%s", today.Year(), today.Month(), today.Day(), p.Start),
-		jst,
+		fmt.Sprintf("%d%02d%02d%s", targetDay.Year(), targetDay.Month(), targetDay.Day(), p.Start),
+		timeutil.JST(),
 	)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse start time")
+	}
 
 	program, err := r.client.GetProgramByStartTime(ctx, p.StationID, from)
 	if err != nil {
@@ -197,7 +222,6 @@ func (r *Recorder) Record(p config.Program) (err error) {
 	); err != nil {
 		return errors.Wrap(err, "failed to write metadata")
 	}
-
 	return nil
 }
 
@@ -240,7 +264,7 @@ func (r *Recorder) download(link, output string) error {
 }
 
 func (r *Recorder) restartScheduler() error {
-	s := gocron.NewScheduler(jst)
+	s := gocron.NewScheduler(timeutil.JST())
 
 	r.config.RLock()
 	defer r.config.RUnlock()

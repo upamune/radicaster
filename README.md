@@ -6,6 +6,41 @@
 $ ulimit -n 16384
 ```
 
+## 設定
+
+ここで指定する曜日は、ラジオ番組で利用される曜日ではないので注意。例えば「火曜25時」なら水曜を指定する。
+
+```yaml
+programs:
+  - cron: "0 4 * * *" # オールナイトニッポン
+    weekdays:
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+    station: LFR
+    start: "0100"
+  - cron: "0 5 * * *" # オールナイトニッポンZERO
+    weekdays:
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+    station: LFR
+    start: "0300"
+  - cron: "0 4 * * *" # TBS JUNK
+    weekdays:
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+    station: TBS
+    start: "0100"
+```
+
 ## Usage
 
 ```bash
