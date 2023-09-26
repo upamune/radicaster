@@ -52,6 +52,14 @@ func realMain() int {
 		Str("revision", Revision).
 		Logger()
 
+	if _, err := os.Stat(*targetDir); err != nil {
+		logger.Warn().Str("target_dir", *targetDir).Msg("targetDir is not found")
+		if err := os.MkdirAll(*targetDir, 0777); err != nil {
+			logger.Error().Err(err).Msg("failed to create targetDir")
+			return 1
+		}
+	}
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create file watcher")
