@@ -25,7 +25,7 @@ func main() {
 func realMain() int {
 	baseURL := flag.String("baseurl", "http://localhost:3333", "base URL of server")
 	targetDir := flag.String("targetdir", "./output", "audio target directory")
-	basicAuth := flag.String("basicauth", "", "basic auth for HTTP server")
+	basicAuth := flag.String("basicauth", "", "Basic認証のための ':' で区切られたユーザー名とパスワード")
 	programConfig := flag.String("config", "./radicast.yaml", "path for config")
 	programConfigURL := flag.String("configurl", "", "url for config")
 	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
