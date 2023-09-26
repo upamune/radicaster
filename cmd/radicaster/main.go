@@ -18,6 +18,11 @@ import (
 	"github.com/upamune/radicaster/record"
 )
 
+var (
+	Version  string
+	Revision string
+)
+
 func main() {
 	os.Exit(realMain())
 }
@@ -41,7 +46,11 @@ func realMain() int {
 		return 1
 	}
 
-	logger := zerolog.New(os.Stderr)
+	logger := zerolog.New(os.Stderr).
+		With().
+		Str("version", Version).
+		Str("revision", Revision).
+		Logger()
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
