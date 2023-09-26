@@ -11,11 +11,11 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
-	"github.com/upamune/podcast-server/config"
-	"github.com/upamune/podcast-server/http"
-	"github.com/upamune/podcast-server/podcast"
-	"github.com/upamune/podcast-server/radikoutil"
-	"github.com/upamune/podcast-server/record"
+	"github.com/upamune/radicaster/config"
+	"github.com/upamune/radicaster/http"
+	"github.com/upamune/radicaster/podcast"
+	"github.com/upamune/radicaster/radikoutil"
+	"github.com/upamune/radicaster/record"
 )
 
 func main() {

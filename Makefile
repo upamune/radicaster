@@ -1,6 +1,6 @@
 .PHONY: build
-build:
-	@go build -o dist/podcastserver cmd/podcastserver/main.go
+build: clean
+	@go build -o dist/radicaster cmd/radicaster/main.go
 
 .PHONY: watch
 watch:

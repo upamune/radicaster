@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/upamune/podcast-server/timeutil"
+	"github.com/upamune/radicaster/timeutil"
 )
 
 func TestParse(t *testing.T) {

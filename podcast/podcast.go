@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/upamune/podcast-server/metadata"
+	"github.com/upamune/radicaster/metadata"
 )
 
 type Podcast struct {

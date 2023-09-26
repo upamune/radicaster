@@ -11,9 +11,9 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"github.com/rs/zerolog"
-	"github.com/upamune/podcast-server/config"
-	"github.com/upamune/podcast-server/podcast"
-	"github.com/upamune/podcast-server/record"
+	"github.com/upamune/radicaster/config"
+	"github.com/upamune/radicaster/podcast"
+	"github.com/upamune/radicaster/record"
 )
 
 func NewHTTPHandler(

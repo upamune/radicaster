@@ -9,7 +9,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog"
-	"github.com/upamune/podcast-server/timeutil"
+	"github.com/upamune/radicaster/timeutil"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 
 	"github.com/cockroachdb/errors"
 	"github.com/rs/zerolog"
-	"github.com/upamune/podcast-server/config"
-	"github.com/upamune/podcast-server/radikoutil"
+	"github.com/upamune/radicaster/config"
+	"github.com/upamune/radicaster/radikoutil"
 )
 
 func TestNewRecord(t *testing.T) {

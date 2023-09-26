@@ -17,9 +17,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/lo"
 	"github.com/sourcegraph/conc/pool"
-	"github.com/upamune/podcast-server/config"
-	"github.com/upamune/podcast-server/metadata"
-	"github.com/upamune/podcast-server/timeutil"
+	"github.com/upamune/radicaster/config"
+	"github.com/upamune/radicaster/metadata"
+	"github.com/upamune/radicaster/timeutil"
 	"github.com/yyoshiki41/go-radiko"
 	"github.com/yyoshiki41/radigo"
 )

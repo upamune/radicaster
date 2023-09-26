@@ -1,4 +1,4 @@
-module github.com/upamune/podcast-server
+module github.com/upamune/radicaster
 
 go 1.21
 
