@@ -18,6 +18,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/upamune/radicaster/config"
+	"github.com/upamune/radicaster/ffmpeg"
 	"github.com/upamune/radicaster/metadata"
 	"github.com/upamune/radicaster/timeutil"
 	"github.com/yyoshiki41/go-radiko"
@@ -43,9 +44,27 @@ type Recorder struct {
 }
 
 func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string, initConfig config.Config) (*Recorder, error) {
+	httpClient := retryablehttp.NewClient()
+	httpClient.Logger = nil
+	httpClient.RequestLogHook = func(_ retryablehttp.Logger, request *http.Request, i int) {
+		logger.Debug().
+			Str("label", "go-retryablehttp").
+			Str("method", request.Method).
+			Str("url", request.URL.String()).
+			Int("attempt", i).
+			Msg("request_log_hook")
+	}
+	httpClient.ResponseLogHook = func(_ retryablehttp.Logger, response *http.Response) {
+		logger.Debug().
+			Str("label", "go-retryablehttp").
+			Str("method", response.Request.Method).
+			Str("url", response.Request.URL.String()).
+			Int("status_code", response.StatusCode).
+			Msg("response_log_hook")
+	}
 	r := &Recorder{
 		client:     client,
-		httpClient: retryablehttp.NewClient(),
+		httpClient: httpClient,
 		logger:     logger,
 		targetDir:  targetDir,
 	}
@@ -152,8 +171,12 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		return errors.Wrap(err, "failed to get chunklist")
 	}
 
-	aacDir := os.TempDir()
+	aacDir, err := os.MkdirTemp(os.TempDir(), "radicaster")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temp dir")
+	}
 	defer os.RemoveAll(aacDir)
+	logger.Debug().Str("aac_temp_dir", aacDir).Msg("created temp dir")
 
 	if err := r.bulkDownload(chunkURLs, aacDir); err != nil {
 		return errors.Wrap(err, "failed to download aac files")
@@ -167,8 +190,12 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		func(i int, dur time.Duration) error {
 			var err error
 			logger.Info().Dur("duration", dur).Int("iter_count", i).Msg("concating aac files")
-			concatedFile, err = radigo.ConcatAACFilesFromList(ctx, aacDir)
+			concatedFile, err = ffmpeg.ConcatAACFilesFromList(ctx, logger, aacDir)
 			if err != nil {
+				logger.Error().
+					Err(err).
+					Str("stack", fmt.Sprintf("%+v", errors.WithStack(err))).
+					Msg("failed to concat aac files")
 				return errors.Wrap(err, "failed to concat aac files")
 			}
 			return nil

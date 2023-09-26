@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/radikoutil"
+	"github.com/upamune/radicaster/timeutil"
 )
 
 func TestNewRecord(t *testing.T) {
@@ -19,7 +20,7 @@ func TestNewRecord(t *testing.T) {
 	}
 
 	r, err := NewRecorder(
-		zerolog.New(zerolog.NewConsoleWriter()),
+		zerolog.New(zerolog.NewConsoleWriter()).Level(zerolog.DebugLevel),
 		c,
 		t.TempDir(),
 		config.Config{
@@ -29,13 +30,14 @@ func TestNewRecord(t *testing.T) {
 		t.Fatalf("%+v\n", errors.WithStack(err))
 	}
 
+	now := time.Now().AddDate(0, 0, -1)
 	if err := r.Record(config.Program{
 		Cron:      "",
+		Weekdays:  []timeutil.Weekday{timeutil.Weekday(now.Weekday())},
 		StationID: "LFR",
 		Start:     "0300",
 		Encoding:  config.AudioFormatAAC,
 	}); err != nil {
 		t.Fatalf("%+v\n", errors.WithStack(err))
 	}
-	time.Sleep(100 * time.Minute)
 }

@@ -34,6 +34,7 @@ func realMain() int {
 	programConfig := flag.String("config", "./radicast.yaml", "path for config")
 	programConfigURL := flag.String("configurl", "", "url for config")
 	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
+	debug := flag.Bool("debug", false, "debug mode")
 	flag.Parse()
 
 	if baseURL == nil || *baseURL == "" {
@@ -46,7 +47,13 @@ func realMain() int {
 		return 1
 	}
 
+	minLogLevel := zerolog.InfoLevel
+	if *debug {
+		minLogLevel = zerolog.DebugLevel
+	}
+
 	logger := zerolog.New(os.Stderr).
+		Level(minLogLevel).
 		With().
 		Str("version", Version).
 		Str("revision", Revision).
