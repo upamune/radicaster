@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/podcast"
