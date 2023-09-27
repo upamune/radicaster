@@ -13,6 +13,7 @@
                     <thead>
                         <tr>
                             <th scope="col">Index</th>
+                            <th scope="col">Title</th>
                             <th scope="col">Cron</th>
                             <th scope="col">Station</th>
                             <th scope="col">Start</th>
@@ -23,6 +24,7 @@
                         {{ range $i, $p := .Programs }}
                         <tr>
                           <td>{{ inc $i }}</td>
+                          <td>{{ $p.Title }}</td>
                           <td>{{ $p.Cron }}</td>
                           <td>{{ $p.StationID }}</td>
                           <td>{{ $p.Start }}</td>
