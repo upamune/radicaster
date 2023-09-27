@@ -12,6 +12,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 	"github.com/go-co-op/gocron"
+	"github.com/goccy/go-yaml"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
@@ -37,13 +38,14 @@ type Recorder struct {
 		*gocron.Scheduler
 	}
 
-	config struct {
+	configFilePath string
+	config         struct {
 		sync.RWMutex
 		config.Config
 	}
 }
 
-func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string, initConfig config.Config) (*Recorder, error) {
+func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string, initConfig config.Config, configFilePath string) (*Recorder, error) {
 	httpClient := retryablehttp.NewClient()
 	httpClient.Logger = nil
 	httpClient.RequestLogHook = func(_ retryablehttp.Logger, request *http.Request, i int) {
@@ -63,10 +65,11 @@ func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string,
 			Msg("response_log_hook")
 	}
 	r := &Recorder{
-		client:     client,
-		httpClient: httpClient,
-		logger:     logger,
-		targetDir:  targetDir,
+		client:         client,
+		httpClient:     httpClient,
+		logger:         logger,
+		targetDir:      targetDir,
+		configFilePath: configFilePath,
 	}
 	r.config.Config = initConfig
 
@@ -332,8 +335,42 @@ func (r *Recorder) refreshConfig(config config.Config) (config.Config, error) {
 	return config, nil
 }
 
-func (r *Recorder) RefreshConfig(config config.Config) (config.Config, error) {
-	return r.refreshConfig(config)
+func (r *Recorder) RefreshConfig(c config.Config) (config.Config, error) {
+	updatedConfig, err := r.refreshConfig(c)
+	if err != nil {
+		return config.Config{}, errors.Wrap(err, "failed to refresh config")
+	}
+	if err := r.refreshLocalConfig(updatedConfig); err != nil {
+		return config.Config{}, errors.Wrap(err, "failed to refresh local config")
+	}
+	return updatedConfig, nil
+}
+
+func (r *Recorder) refreshLocalConfig(c config.Config) error {
+	if r.configFilePath == "" {
+		r.logger.Debug().
+			Msg("skip refreshing local config because config file path is empty")
+		return nil
+	}
+
+	f, err := os.Create(r.configFilePath)
+	if err != nil {
+		return errors.Wrap(err, "failed to open config file")
+	}
+	defer f.Close()
+
+	if err := yaml.NewEncoder(
+		f,
+		yaml.Indent(2),
+	).Encode(c); err != nil {
+		return errors.Wrap(err, "failed to encode config")
+	}
+	r.logger.Debug().
+		Str("config_file_path", r.configFilePath).
+		Any("config", c).
+		Msg("finish refreshing local config")
+
+	return nil
 }
 
 func (r *Recorder) RefreshConfigByURL(configURL string) (config.Config, error) {

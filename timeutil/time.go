@@ -32,11 +32,8 @@ func (w *Weekday) String() string {
 	return time.Weekday(*w).String()
 }
 
-func (w *Weekday) MarshalJSON() ([]byte, error) {
-	if w == nil {
-		return json.Marshal("")
-	}
-	return json.Marshal(time.Weekday(*w).String())
+func (w Weekday) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Weekday(w).String())
 }
 
 func (w *Weekday) UnmarshalJSON(b []byte) error {
@@ -48,11 +45,9 @@ func (w *Weekday) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (w *Weekday) MarshalYAML() ([]byte, error) {
-	if w == nil {
-		return yaml.Marshal("")
-	}
-	return yaml.Marshal(time.Weekday(*w).String())
+func (w Weekday) MarshalYAML() ([]byte, error) {
+	s := time.Weekday(w).String()
+	return yaml.Marshal(s)
 }
 
 func (w *Weekday) UnmarshalYAML(b []byte) error {
@@ -66,19 +61,19 @@ func (w *Weekday) UnmarshalYAML(b []byte) error {
 
 func newWeekday(day string) (time.Weekday, error) {
 	switch strings.ToLower(day) {
-	case "sunday", "sun":
+	case "sunday", "sun", "0":
 		return time.Sunday, nil
-	case "monday", "mon":
+	case "monday", "mon", "1":
 		return time.Monday, nil
-	case "tuesday", "tue":
+	case "tuesday", "tue", "2":
 		return time.Tuesday, nil
-	case "wednesday", "wed":
+	case "wednesday", "wed", "3":
 		return time.Wednesday, nil
-	case "thursday", "thu":
+	case "thursday", "thu", "4":
 		return time.Thursday, nil
-	case "friday", "fri":
+	case "friday", "fri", "5":
 		return time.Friday, nil
-	case "saturday", "sat":
+	case "saturday", "sat", "6":
 		return time.Saturday, nil
 	default:
 		return -1, fmt.Errorf("invalid day: %s", day)

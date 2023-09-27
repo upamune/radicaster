@@ -25,7 +25,9 @@ func TestNewRecord(t *testing.T) {
 		t.TempDir(),
 		config.Config{
 			Programs: []config.Program{},
-		})
+		},
+		"",
+	)
 	if err != nil {
 		t.Fatalf("%+v\n", errors.WithStack(err))
 	}

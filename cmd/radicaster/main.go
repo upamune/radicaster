@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	httpstd "net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
+	"github.com/samber/lo"
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/http"
 	"github.com/upamune/radicaster/podcast"
@@ -31,7 +33,7 @@ func realMain() int {
 	baseURL := flag.String("baseurl", "http://localhost:3333", "base URL of server")
 	targetDir := flag.String("targetdir", "./output", "audio target directory")
 	basicAuth := flag.String("basicauth", "", "Basic認証のための ':' で区切られたユーザー名とパスワード")
-	programConfig := flag.String("config", "./radicast.yaml", "path for config")
+	programConfig := flag.String("config", "", "path for config")
 	programConfigURL := flag.String("configurl", "", "url for config")
 	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
 	debug := flag.Bool("debug", false, "debug mode")
@@ -132,9 +134,11 @@ func realMain() int {
 		return 1
 	}
 
+	logger.Debug().Any("config", initConfig).Msg("initial config")
+
 	ctx := context.Background()
 	radikoClient, err := radikoutil.NewClient(ctx)
-	recorder, err := record.NewRecorder(logger, radikoClient, *targetDir, initConfig)
+	recorder, err := record.NewRecorder(logger, radikoClient, *targetDir, initConfig, lo.FromPtrOr(programConfig, ""))
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create recorder")
 		return 1
@@ -164,9 +168,13 @@ func realMain() int {
 
 	logger.Info().Str("base_url", *baseURL).Msg("http server is starting...")
 	if err := server.ListenAndServe(); err != nil {
-		logger.Error().Err(err).Msg("failed to listen and serve")
-		return 1
+		if !errors.Is(err, httpstd.ErrServerClosed) {
+			logger.Error().Err(err).Msg("failed to listen and serve")
+			return 1
+		}
 	}
+
+	logger.Info().Msg("server is shutdown")
 
 	return 0
 }
