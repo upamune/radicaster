@@ -46,6 +46,19 @@ func Parse(r io.Reader) (Config, error) {
 
 func Init(configFilePath *string, configURL *string) (Config, error) {
 	if configFilePath != nil && *configFilePath != "" {
+		// NOTE: ファイルが存在しない場合、空で作成する
+		if _, err := os.Stat(*configFilePath); err != nil {
+			f, err := os.Create(*configFilePath)
+			if err != nil {
+				return Config{}, errors.Wrap(err, "failed to create config file")
+			}
+			defer f.Close()
+			var c Config
+			if err := yaml.NewEncoder(f).Encode(c); err != nil {
+				return c, errors.Wrap(err, "failed to encode yaml")
+			}
+			return c, nil
+		}
 		f, err := os.Open(*configFilePath)
 		if err != nil {
 			return Config{}, errors.Wrap(err, "failed to open config file")

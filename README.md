@@ -12,7 +12,8 @@ $ ulimit -n 16384
 
 ```yaml
 programs:
-  - cron: "0 4 * * *" # オールナイトニッポン
+  - cron: "0 4 * * *"
+    title: "オールナイトニッポン"
     weekdays:
       - tue
       - wed
@@ -21,7 +22,8 @@ programs:
       - sat
     station: LFR
     start: "0100"
-  - cron: "0 5 * * *" # オールナイトニッポンZERO
+  - cron: "0 5 * * *"
+    title: "オールナイトニッポンZERO"
     weekdays:
       - tue
       - wed
@@ -30,7 +32,8 @@ programs:
       - sat
     station: LFR
     start: "0300"
-  - cron: "0 4 * * *" # TBS JUNK
+  - cron: "0 4 * * *"
+    titile: "TBS JUNK"
     weekdays:
       - tue
       - wed
@@ -44,12 +47,11 @@ programs:
 ## Usage
 
 ```bash
-$ rec_radiko_ts.sh -s TBS -f 202104210100 -d 120 -o output/爆笑問題カーボーイ`date +%Y年%m月%d日`_`date +%Y%m%d%H%M` # https://github.com/uru2/rec_radiko_ts
-$ radicaster -baseurl http://localhost:3333 -targetdir ./output
+$ radicaster -baseurl http://localhost:3333 -config ./radicaster.yaml -targetdir ./output
 ```
 
 ## Usage with BasicAuth
 
 ```bash
-$ radicaster -baseurl http://localhost:3333 -targetdir ./output -basicauth user:password
+$ radicaster -baseurl http://localhost:3333 -config ./radicaster.yaml  -targetdir ./output -basicauth user:password
 ```
