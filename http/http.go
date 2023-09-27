@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"crypto/subtle"
+	"embed"
 	"html/template"
 	"net/http"
 	"strings"
@@ -15,6 +16,9 @@ import (
 	"github.com/upamune/radicaster/podcast"
 	"github.com/upamune/radicaster/record"
 )
+
+//go:embed views
+var views embed.FS
 
 func NewHTTPHandler(
 	logger zerolog.Logger,
@@ -58,7 +62,7 @@ func NewHTTPHandler(
 				return i + 1
 			},
 		}).
-		ParseFiles("http/views/config.html.tmpl"))
+		ParseFS(views, "views/config.html.tmpl"))
 	e.GET("/config", func(c echo.Context) error {
 		config := recorder.Config()
 

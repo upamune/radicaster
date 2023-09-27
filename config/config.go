@@ -22,6 +22,7 @@ type Config struct {
 }
 
 type Program struct {
+	Title     string             `yaml:"title,omitempty" json:"title,omitempty"`
 	Weekdays  []timeutil.Weekday `yaml:"weekdays" json:"weekdays"`
 	Cron      string             `yaml:"cron" json:"cron"`
 	StationID string             `yaml:"station" json:"station"`
@@ -44,7 +45,7 @@ func Parse(r io.Reader) (Config, error) {
 }
 
 func Init(configFilePath *string, configURL *string) (Config, error) {
-	if configFilePath != nil {
+	if configFilePath != nil && *configFilePath != "" {
 		f, err := os.Open(*configFilePath)
 		if err != nil {
 			return Config{}, errors.Wrap(err, "failed to open config file")
@@ -53,7 +54,7 @@ func Init(configFilePath *string, configURL *string) (Config, error) {
 		return Parse(f)
 	}
 
-	if configURL != nil {
+	if configURL != nil && *configURL != "" {
 		resp, err := http.Get(*configURL)
 		if err != nil {
 			return Config{}, errors.Wrap(
@@ -73,6 +74,7 @@ func Init(configFilePath *string, configURL *string) (Config, error) {
 
 func (p Program) MarshalZerologObject(e *zerolog.Event) {
 	e.Str("cron", p.Cron).
+		Str("title", p.Title).
 		Str("station_id", p.StationID).
 		Str("start", p.Start).
 		Str("encoding", p.Encoding).

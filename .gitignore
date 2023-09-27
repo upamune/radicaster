@@ -2,7 +2,6 @@
 /output
 /tmp
 .DS_Store
-radicast.yaml
-
+*.yaml
 *.aac
 *.mp3
