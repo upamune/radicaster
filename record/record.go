@@ -149,7 +149,12 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 			),
 		)
 	}
-	logger.Info().Time("from", from).Str("program_title", program.Title).Msg("program found")
+	logger.Info().
+		Time("from", from).
+		Str("program_title", program.Title).
+		Str("program_ft", program.Ft).
+		Str("program_to", program.To).
+		Msg("program found")
 
 	fileName := fmt.Sprintf(
 		"%s_%s.%s",
