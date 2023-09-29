@@ -59,6 +59,8 @@ func realMain() int {
 		With().
 		Str("version", Version).
 		Str("revision", Revision).
+		Stack().
+		Caller().
 		Logger()
 
 	if _, err := os.Stat(*targetDir); err != nil {
