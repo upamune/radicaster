@@ -82,7 +82,8 @@ func newWeekday(day string) (time.Weekday, error) {
 
 func LastSpecifiedWeekday(weekday Weekday, now time.Time) (time.Time, error) {
 	targetWeekday := time.Weekday(weekday)
-	for i := 0; i <= 7; i++ {
+	// NOTE: 無料だと1週間前まで遡れないので6日前までにしている。
+	for i := 0; i <= 6; i++ {
 		previousDay := now.AddDate(0, 0, -i)
 		if previousDay.Weekday() == targetWeekday {
 			return previousDay, nil

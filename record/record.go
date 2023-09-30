@@ -171,7 +171,14 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 
 	uri, err := r.client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
 	if err != nil {
-		return errors.Wrap(err, "failed to get m3u8")
+		return errors.Wrap(
+			err,
+			fmt.Sprintf(
+				"failed to get m3u8: %s %s %s",
+				p.StationID,
+				p.Title,
+				from.Format(time.DateOnly),
+			))
 	}
 
 	chunkURLs, err := radiko.GetChunklistFromM3U8(uri)
