@@ -95,7 +95,10 @@ func (p *Podcaster) Sync() error {
 		p.logger.Info().Msg("Podcaster.Sync ended")
 	}()
 
-	var pathGroupedEpisodes = make(map[string][]Episode)
+	var (
+		allEpisodes         []Episode
+		pathGroupedEpisodes = make(map[string][]Episode)
+	)
 	p.logger.Info().Str("target_dir", p.targetDir).Msg("filepath.Walk is starting")
 	if err := filepath.Walk(p.targetDir, func(fpath string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -153,6 +156,7 @@ func (p *Podcaster) Sync() error {
 			podcastPath = md.Path
 		}
 
+		allEpisodes = append(allEpisodes, ep)
 		pathGroupedEpisodes[podcastPath] = append(pathGroupedEpisodes[podcastPath], ep)
 
 		return nil
@@ -161,11 +165,24 @@ func (p *Podcaster) Sync() error {
 	}
 
 	feedMap := make(map[string]string)
+
+	encodePodcastToXML := func(podcast *Podcast) (string, error) {
+		buf := bytes.NewBuffer(nil)
+		p.logger.Info().Msg("encodeXML is starting")
+		if err := encodeXML(buf, podcast); err != nil {
+			return "", errors.Wrap(err, "failed to encodeXM")
+		}
+		return buf.String(), nil
+	}
 	for path, episodes := range pathGroupedEpisodes {
 		path, episodes := path, episodes
+
 		if len(episodes) == 0 {
 			continue
 		}
+
+		// NOTE: `/ann` のような設定を `ann` と同値にしてあげる
+		path = strings.ToLower(strings.TrimPrefix(path, "/"))
 
 		latestEpisode := slices.MaxFunc(episodes, func(cur, max Episode) int {
 			if cur.PublishedAt.Unix() > max.PublishedAt.Unix() {
@@ -200,16 +217,31 @@ func (p *Podcaster) Sync() error {
 		}
 
 		podcast.Episodes = episodes
-		buf := bytes.NewBuffer(nil)
-		p.logger.Info().Msg("encodeXML is starting")
-		if err := encodeXML(buf, podcast); err != nil {
+		feed, err := encodePodcastToXML(podcast)
+		if err != nil {
 			p.logger.Err(err).
 				Str("path", path).
 				Msg("failed to encodeXML")
-			return errors.Wrapf(err, "failed to encodeXML: %s", path)
+			return errors.Wrapf(err, "path=%s", path)
 		}
-		feedMap[path] = buf.String()
+		feedMap[path] = feed
 	}
+
+	feed, err := encodePodcastToXML(
+		&Podcast{
+			Title:       p.title,
+			Link:        p.link,
+			Description: p.description,
+			PublishedAt: p.publishedAt,
+			ImageURL:    p.imageURL,
+			Episodes:    allEpisodes,
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "all episodes")
+	}
+	p.logger.Debug().Str("all_feed", feed).Msg("all episodes feed is generated")
+	feedMap["all"] = feed
 
 	p.mu.Lock()
 	p.feedMap = feedMap

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/cockroachdb/errors"
 	"github.com/goccy/go-yaml"
@@ -106,4 +107,17 @@ func (p Programs) MarshalZerologArray(a *zerolog.Array) {
 
 func (c Config) MarshalZerologObject(e *zerolog.Event) {
 	e.Array("programs", Programs(c.Programs))
+}
+
+func (c Config) Validate() error {
+	for _, program := range c.Programs {
+		p := strings.ToLower(strings.TrimPrefix(program.Path, "/"))
+		if p == "all" {
+			return errors.Newf(
+				"pathに `all` は使用できません: program_title=%s",
+				program.Title,
+			)
+		}
+	}
+	return nil
 }
