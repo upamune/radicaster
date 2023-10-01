@@ -138,6 +138,11 @@ func realMain() int {
 
 	logger.Debug().Any("config", initConfig).Msg("initial config")
 
+	if err := initConfig.Validate(); err != nil {
+		logger.Error().Err(err).Msg("invalid config")
+		return 1
+	}
+
 	ctx := context.Background()
 	radikoClient, err := radikoutil.NewClient(ctx)
 	recorder, err := record.NewRecorder(logger, radikoClient, *targetDir, initConfig, lo.FromPtrOr(programConfig, ""))

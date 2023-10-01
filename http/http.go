@@ -130,6 +130,10 @@ func NewHTTPHandler(
 			}
 		}
 
+		if err := c.Validate(); err != nil {
+			return ctx.String(http.StatusInternalServerError, err.Error())
+		}
+
 		updatedConfig, err := recorder.RefreshConfig(c)
 		if err != nil {
 			return ctx.String(http.StatusInternalServerError, err.Error())
