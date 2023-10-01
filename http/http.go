@@ -51,7 +51,7 @@ func NewHTTPHandler(
 	}
 
 	e.GET("/", func(c echo.Context) error {
-		return c.Blob(http.StatusOK, "application/xml", []byte(podcaster.GetFeed()))
+		return c.Blob(http.StatusOK, "application/xml", []byte(podcaster.GetDefaultFeed()))
 	})
 	e.GET("/sync", func(c echo.Context) error {
 		if err := podcaster.Sync(); err != nil {
@@ -61,7 +61,16 @@ func NewHTTPHandler(
 	})
 
 	e.GET("/rss.xml", func(c echo.Context) error {
-		return c.Blob(http.StatusOK, "application/xml", []byte(podcaster.GetFeed()))
+		return c.Blob(http.StatusOK, "application/xml", []byte(podcaster.GetDefaultFeed()))
+	})
+
+	e.GET("/:program_path/rss.xml", func(c echo.Context) error {
+		programPath := c.Param("program_path")
+		return c.Blob(
+			http.StatusOK,
+			"application/xml",
+			[]byte(podcaster.GetFeed(programPath)),
+		)
 	})
 
 	t := template.Must(template.New("config.html.tmpl").

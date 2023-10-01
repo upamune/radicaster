@@ -22,6 +22,7 @@ programs:
       - sat
     station: LFR
     start: "0100"
+    path: ann
   - cron: "0 5 * * *"
     title: "オールナイトニッポンZERO"
     weekdays:
@@ -32,6 +33,7 @@ programs:
       - sat
     station: LFR
     start: "0300"
+    path: ann_zero
   - cron: "0 4 * * *"
     titile: "TBS JUNK"
     weekdays:
@@ -42,6 +44,7 @@ programs:
       - sat
     station: TBS
     start: "0100"
+    path: junk
 ```
 
 ## Usage

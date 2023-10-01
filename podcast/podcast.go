@@ -8,10 +8,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/cockroachdb/errors"
 	"github.com/rs/zerolog"
 	"github.com/upamune/radicaster/metadata"
 )
@@ -47,8 +49,8 @@ type Podcaster struct {
 	publishedAt *time.Time
 	imageURL    string
 
-	mu   *sync.RWMutex
-	feed string
+	mu      *sync.RWMutex
+	feedMap map[string]string
 }
 
 func NewPodcaster(
@@ -75,10 +77,16 @@ func NewPodcaster(
 	return p
 }
 
-func (p *Podcaster) GetFeed() string {
+func (p *Podcaster) GetDefaultFeed() string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.feed
+	return p.feedMap[""]
+}
+
+func (p *Podcaster) GetFeed(path string) string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.feedMap[path]
 }
 
 func (p *Podcaster) Sync() error {
@@ -87,14 +95,7 @@ func (p *Podcaster) Sync() error {
 		p.logger.Info().Msg("Podcaster.Sync ended")
 	}()
 
-	podcast := &Podcast{
-		Title:       p.title,
-		Link:        p.link,
-		Description: p.description,
-		PublishedAt: p.publishedAt,
-		ImageURL:    p.imageURL,
-	}
-
+	var pathGroupedEpisodes = make(map[string][]Episode)
 	p.logger.Info().Str("target_dir", p.targetDir).Msg("filepath.Walk is starting")
 	if err := filepath.Walk(p.targetDir, func(fpath string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -141,30 +142,77 @@ func (p *Podcaster) Sync() error {
 			ep.PublishedAt = &now
 		}
 
+		var podcastPath string
 		// NOTE: メタデータがあればそれで全て上書きする
 		if md, err := metadata.ReadByAudioFilePath(fpath); err == nil {
 			ep.Title = md.Title
 			ep.Description = md.Description
 			ep.PublishedAt = &md.PublishedAt
 			ep.ImageURL = md.ImageURL
+
+			podcastPath = md.Path
 		}
 
-		podcast.Episodes = append(podcast.Episodes, ep)
+		pathGroupedEpisodes[podcastPath] = append(pathGroupedEpisodes[podcastPath], ep)
 
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	buf := bytes.NewBuffer(nil)
-	p.logger.Info().Msg("encodeXML is starting")
-	if err := encodeXML(buf, podcast); err != nil {
-		return fmt.Errorf("failed to encodeXML: %w", err)
+	feedMap := make(map[string]string)
+	for path, episodes := range pathGroupedEpisodes {
+		path, episodes := path, episodes
+		if len(episodes) == 0 {
+			continue
+		}
+
+		latestEpisode := slices.MaxFunc(episodes, func(cur, max Episode) int {
+			if cur.PublishedAt.Unix() > max.PublishedAt.Unix() {
+				return 1
+			}
+			return 0
+		})
+
+		p.logger.Debug().
+			Str("path", path).
+			Str("title", latestEpisode.Title).
+			Time("published_at", *latestEpisode.PublishedAt).
+			Msg("latestEpisode is found")
+
+		podcast := &Podcast{
+			Title:       latestEpisode.Title,
+			Link:        p.link,
+			Description: latestEpisode.Description,
+			PublishedAt: p.publishedAt,
+			ImageURL:    latestEpisode.ImageURL,
+		}
+
+		// NOTE: デフォルトパス(= "")の場合はデフォルト設定にする
+		if path == "" {
+			podcast = &Podcast{
+				Title:       p.title,
+				Link:        p.link,
+				Description: p.description,
+				PublishedAt: p.publishedAt,
+				ImageURL:    p.imageURL,
+			}
+		}
+
+		podcast.Episodes = episodes
+		buf := bytes.NewBuffer(nil)
+		p.logger.Info().Msg("encodeXML is starting")
+		if err := encodeXML(buf, podcast); err != nil {
+			p.logger.Err(err).
+				Str("path", path).
+				Msg("failed to encodeXML")
+			return errors.Wrapf(err, "failed to encodeXML: %s", path)
+		}
+		feedMap[path] = buf.String()
 	}
-	feed := buf.String()
 
 	p.mu.Lock()
-	p.feed = feed
+	p.feedMap = feedMap
 	p.mu.Unlock()
 
 	return nil

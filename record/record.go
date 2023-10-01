@@ -260,6 +260,7 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 			Description: program.Desc,
 			PublishedAt: from,
 			ImageURL:    p.ImageURL,
+			Path:        p.Path,
 		},
 	); err != nil {
 		return errors.Wrap(err, "failed to write metadata")
