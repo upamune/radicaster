@@ -235,7 +235,7 @@ func (p *Podcaster) Sync() error {
 
 	feed, err := encodePodcastToXML(
 		&Podcast{
-			Title:       p.title,
+			Title:       fmt.Sprintf("%s(ALL)", p.title),
 			Link:        p.link,
 			Description: p.description,
 			PublishedAt: p.publishedAt,
