@@ -22,6 +22,7 @@ var views embed.FS
 
 func NewHTTPHandler(
 	logger zerolog.Logger,
+	version, revision string,
 	podcaster *podcast.Podcaster,
 	recorder *record.Recorder,
 	targetDir string,
@@ -101,7 +102,11 @@ func NewHTTPHandler(
 		var buf bytes.Buffer
 		if err := t.Execute(
 			&buf,
-			map[string]interface{}{"Programs": config.Programs},
+			map[string]interface{}{
+				"Programs": config.Programs,
+				"Version":  version,
+				"Revision": revision,
+			},
 		); err != nil {
 			return c.String(http.StatusInternalServerError, "")
 		}
