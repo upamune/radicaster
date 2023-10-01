@@ -14,6 +14,7 @@ type EpisodeMetadata struct {
 	Description string    `json:"description"`
 	PublishedAt time.Time `json:"published_at"`
 	ImageURL    string    `json:"image_url"`
+	Path        string    `json:"path"`
 }
 
 func createMetadataPath(base string) string {

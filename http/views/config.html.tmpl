@@ -1,11 +1,11 @@
 <html>
     <head>
-        <title>Radicast - Config</title>
+        <title>Radicaster - Config</title>
         <link rel="stylesheet" href="https://unpkg.com/awsm.css/dist/awsm.min.css">
     </head>
     <body>
         <header>
-            <h2>Current Config</h2>
+            <h2>Config</h2>
         </header>
         <main>
             <article>
@@ -13,7 +13,9 @@
                     <thead>
                         <tr>
                             <th scope="col">Index</th>
+                            <th scope="col">Image</th>
                             <th scope="col">Title</th>
+                            <th scope="col">Path</th>
                             <th scope="col">Cron</th>
                             <th scope="col">Station</th>
                             <th scope="col">Start</th>
@@ -24,7 +26,9 @@
                         {{ range $i, $p := .Programs }}
                         <tr>
                           <td>{{ inc $i }}</td>
+                          <td><img src="{{ $p.ImageURL }}" width="100px" /></td>
                           <td>{{ $p.Title }}</td>
+                          <td><a href="{{ if ne $p.Path "" }}/{{ $p.Path }}/rss.xml{{ else }}/rss.xml{{ end }}">/{{ $p.Path }}</a></td>
                           <td>{{ $p.Cron }}</td>
                           <td>{{ $p.StationID }}</td>
                           <td>{{ $p.Start }}</td>
