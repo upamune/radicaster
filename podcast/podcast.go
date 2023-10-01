@@ -35,6 +35,7 @@ type Episode struct {
 	URL           string
 	LengthInBytes int64
 	ImageURL      string
+	PodcastTitle  string
 }
 
 type Podcaster struct {
@@ -152,6 +153,7 @@ func (p *Podcaster) Sync() error {
 			ep.Description = md.Description
 			ep.PublishedAt = &md.PublishedAt
 			ep.ImageURL = md.ImageURL
+			ep.PodcastTitle = md.PodcastTitle
 
 			podcastPath = md.Path
 		}
@@ -197,10 +199,14 @@ func (p *Podcaster) Sync() error {
 			Time("published_at", *latestEpisode.PublishedAt).
 			Msg("latestEpisode is found")
 
+		podcastTitle := p.title
+		if latestEpisode.PodcastTitle != "" {
+			podcastTitle = latestEpisode.PodcastTitle
+		}
 		podcast := &Podcast{
-			Title:       latestEpisode.Title,
+			Title:       podcastTitle,
 			Link:        p.link,
-			Description: latestEpisode.Description,
+			Description: p.description,
 			PublishedAt: p.publishedAt,
 			ImageURL:    latestEpisode.ImageURL,
 		}

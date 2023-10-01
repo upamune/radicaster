@@ -10,19 +10,20 @@ import (
 )
 
 type EpisodeMetadata struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	PublishedAt time.Time `json:"published_at"`
-	ImageURL    string    `json:"image_url"`
-	Path        string    `json:"path"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	PublishedAt  time.Time `json:"published_at"`
+	ImageURL     string    `json:"image_url"`
+	Path         string    `json:"path"`
+	PodcastTitle string    `json:"podcast_title"`
 }
 
-func createMetadataPath(base string) string {
+func buildMetadataPath(base string) string {
 	return fmt.Sprintf("%s.json", base)
 }
 
 func WriteByAudioFilePath(basePath string, metadata EpisodeMetadata) error {
-	path := createMetadataPath(basePath)
+	path := buildMetadataPath(basePath)
 
 	f, err := os.Create(path)
 	if err != nil {
@@ -36,7 +37,7 @@ func WriteByAudioFilePath(basePath string, metadata EpisodeMetadata) error {
 }
 
 func ReadByAudioFilePath(basePath string) (EpisodeMetadata, error) {
-	path := createMetadataPath(basePath)
+	path := buildMetadataPath(basePath)
 
 	f, err := os.Open(path)
 	if err != nil {

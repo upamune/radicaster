@@ -256,11 +256,12 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 	if err := metadata.WriteByAudioFilePath(
 		output,
 		metadata.EpisodeMetadata{
-			Title:       program.Title,
-			Description: program.Desc,
-			PublishedAt: from,
-			ImageURL:    p.ImageURL,
-			Path:        p.Path,
+			Title:        program.Title,
+			Description:  program.Desc,
+			PublishedAt:  from,
+			ImageURL:     p.ImageURL,
+			Path:         p.Path,
+			PodcastTitle: p.Title,
 		},
 	); err != nil {
 		return errors.Wrap(err, "failed to write metadata")
