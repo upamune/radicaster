@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/errors"
+	"github.com/h2non/filetype"
 	"github.com/rs/zerolog"
 	"github.com/upamune/radicaster/metadata"
 )
@@ -112,13 +113,10 @@ func (p *Podcaster) Sync() error {
 
 		p.logger.Info().Str("path", fpath).Err(err).Msg("found a target file")
 
-		stat, err := os.Stat(fpath)
-		if err != nil {
-			return err
-		}
-
-		if filepath.Ext(fpath) == ".json" {
-			p.logger.Info().Str("path", fpath).Msg("skip a json file")
+		if !p.isAudioFile(fpath) {
+			p.logger.Info().
+				Str("path", fpath).
+				Msg("skip because the file is not audio file")
 			return nil
 		}
 
@@ -130,6 +128,10 @@ func (p *Podcaster) Sync() error {
 		}
 		u.Path = path.Join(u.Path, "static", baseName)
 
+		stat, err := os.Stat(fpath)
+		if err != nil {
+			return err
+		}
 		ep := Episode{
 			Title:         fpath,
 			URL:           u.String(),
@@ -186,6 +188,7 @@ func (p *Podcaster) Sync() error {
 		// NOTE: `/ann` のような設定を `ann` と同値にしてあげる
 		path = strings.ToLower(strings.TrimPrefix(path, "/"))
 
+		// TODO: 配信されるフィードのことを考えるとepisodes をPublishedAtの降順でソートしたほうが良いかも。最新が先頭に来るようにする。
 		latestEpisode := slices.MaxFunc(episodes, func(cur, max Episode) int {
 			if cur.PublishedAt.Unix() > max.PublishedAt.Unix() {
 				return 1
@@ -246,7 +249,7 @@ func (p *Podcaster) Sync() error {
 	if err != nil {
 		return errors.Wrap(err, "all episodes")
 	}
-	p.logger.Debug().Str("all_feed", feed).Msg("all episodes feed is generated")
+	p.logger.Trace().Str("all_feed", feed).Msg("all episodes feed is generated")
 	feedMap["all"] = feed
 
 	p.mu.Lock()
@@ -254,4 +257,23 @@ func (p *Podcaster) Sync() error {
 	p.mu.Unlock()
 
 	return nil
+}
+
+func (p *Podcaster) isAudioFile(fpath string) bool {
+	f, err := os.Open(fpath)
+	if err != nil {
+		p.logger.Debug().Err(err).Str("path", fpath).
+			Msg("failed to open file for checking audio file")
+		return false
+	}
+	defer f.Close()
+
+	// NOTE: 音声ファイルかどうかの判別には先頭20バイトあれば足りる
+	head := make([]byte, 20)
+	if _, err := f.Read(head); err != nil {
+		p.logger.Debug().Err(err).Str("path", fpath).
+			Msg("failed to read first 20 bytes of the file for checking audio file")
+		return false
+	}
+	return filetype.IsAudio(head)
 }

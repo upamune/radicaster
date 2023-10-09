@@ -40,7 +40,7 @@ func TestParse(t *testing.T) {
 		filename string
 	}{
 		"yaml": {
-			filename: "testdata/radicast.yaml",
+			filename: "testdata/radicaster.yaml",
 		},
 	}
 	for name, tt := range tests {
