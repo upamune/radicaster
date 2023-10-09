@@ -165,7 +165,7 @@ func ConcatAACFiles(ctx context.Context, logger zerolog.Logger, input []string, 
 		return errors.Wrap(err, "failed to read stderr")
 	}
 
-	logger.Debug().
+	logger.Trace().
 		Str("label", "ffmpeg").
 		Str("stderr", string(b)).
 		Msg("concatenate aac files by ffmpeg")

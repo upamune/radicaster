@@ -21,6 +21,7 @@ import (
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/ffmpeg"
 	"github.com/upamune/radicaster/metadata"
+	"github.com/upamune/radicaster/radikoutil"
 	"github.com/upamune/radicaster/timeutil"
 	"github.com/yyoshiki41/go-radiko"
 	"github.com/yyoshiki41/radigo"
@@ -28,7 +29,6 @@ import (
 
 type Recorder struct {
 	httpClient *retryablehttp.Client
-	client     *radiko.Client
 	logger     zerolog.Logger
 
 	targetDir string
@@ -45,7 +45,7 @@ type Recorder struct {
 	}
 }
 
-func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string, initConfig config.Config, configFilePath string) (*Recorder, error) {
+func NewRecorder(logger zerolog.Logger, targetDir string, initConfig config.Config, configFilePath string) (*Recorder, error) {
 	httpClient := retryablehttp.NewClient()
 	httpClient.Logger = nil
 	httpClient.RequestLogHook = func(_ retryablehttp.Logger, request *http.Request, i int) {
@@ -65,7 +65,6 @@ func NewRecorder(logger zerolog.Logger, client *radiko.Client, targetDir string,
 			Msg("response_log_hook")
 	}
 	r := &Recorder{
-		client:         client,
 		httpClient:     httpClient,
 		logger:         logger,
 		targetDir:      targetDir,
@@ -138,7 +137,12 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		return errors.Wrap(err, "failed to parse start time")
 	}
 
-	program, err := r.client.GetProgramByStartTime(ctx, p.StationID, from)
+	// NOTE: Radikoのクライアントは毎回初期化しないと、認証エラーになってしまう
+	client, err := radikoutil.NewClient(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to create radiko client")
+	}
+	program, err := client.GetProgramByStartTime(ctx, p.StationID, from)
 	if err != nil {
 		return errors.Wrap(
 			err,
@@ -169,7 +173,7 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		return nil
 	}
 
-	uri, err := r.client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
+	uri, err := client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
 	if err != nil {
 		return errors.Wrap(
 			err,

@@ -8,6 +8,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-co-op/gocron v1.34.2
 	github.com/goccy/go-yaml v1.11.2
+	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/rs/xid v1.5.0

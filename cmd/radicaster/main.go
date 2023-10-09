@@ -16,7 +16,6 @@ import (
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/http"
 	"github.com/upamune/radicaster/podcast"
-	"github.com/upamune/radicaster/radikoutil"
 	"github.com/upamune/radicaster/record"
 )
 
@@ -37,6 +36,7 @@ func realMain() int {
 	programConfigURL := flag.String("configurl", "", "url for config")
 	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
 	debug := flag.Bool("debug", false, "debug mode")
+	trace := flag.Bool("trace", false, "trace mode")
 	flag.Parse()
 
 	if baseURL == nil || *baseURL == "" {
@@ -49,13 +49,8 @@ func realMain() int {
 		return 1
 	}
 
-	minLogLevel := zerolog.InfoLevel
-	if *debug {
-		minLogLevel = zerolog.DebugLevel
-	}
-
 	logger := zerolog.New(os.Stderr).
-		Level(minLogLevel).
+		Level(getMinLogLevel(debug, trace)).
 		With().
 		Str("version", Version).
 		Str("revision", Revision).
@@ -144,8 +139,7 @@ func realMain() int {
 	}
 
 	ctx := context.Background()
-	radikoClient, err := radikoutil.NewClient(ctx)
-	recorder, err := record.NewRecorder(logger, radikoClient, *targetDir, initConfig, lo.FromPtrOr(programConfig, ""))
+	recorder, err := record.NewRecorder(logger, *targetDir, initConfig, lo.FromPtrOr(programConfig, ""))
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create recorder")
 		return 1
@@ -184,4 +178,14 @@ func realMain() int {
 	logger.Info().Msg("server is shutdown")
 
 	return 0
+}
+
+func getMinLogLevel(debug, trace *bool) zerolog.Level {
+	if trace != nil && *trace {
+		return zerolog.TraceLevel
+	}
+	if debug != nil && *debug {
+		return zerolog.DebugLevel
+	}
+	return zerolog.InfoLevel
 }
