@@ -85,10 +85,24 @@ func (p *Podcaster) GetDefaultFeed() string {
 	return p.feedMap[""]
 }
 
-func (p *Podcaster) GetFeed(path string) string {
+func (p *Podcaster) GetFeed(path string) (string, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.feedMap[path]
+	feed, ok := p.feedMap[path]
+	return feed, ok
+}
+
+func sortEpisodesByPublishedAtDesc(episodes []Episode) {
+	slices.SortStableFunc(episodes, func(a, b Episode) int {
+		if a.PublishedAt.Unix() == b.PublishedAt.Unix() {
+			return 0
+		}
+		// NOTE: 降順にしたいので逆にしている
+		if a.PublishedAt.Unix() < b.PublishedAt.Unix() {
+			return 1
+		}
+		return -1
+	})
 }
 
 func (p *Podcaster) Sync() error {
@@ -188,16 +202,12 @@ func (p *Podcaster) Sync() error {
 		// NOTE: `/ann` のような設定を `ann` と同値にしてあげる
 		path = strings.ToLower(strings.TrimPrefix(path, "/"))
 
-		// TODO: 配信されるフィードのことを考えるとepisodes をPublishedAtの降順でソートしたほうが良いかも。最新が先頭に来るようにする。
-		latestEpisode := slices.MaxFunc(episodes, func(cur, max Episode) int {
-			if cur.PublishedAt.Unix() > max.PublishedAt.Unix() {
-				return 1
-			}
-			return 0
-		})
+		sortEpisodesByPublishedAtDesc(episodes)
+		latestEpisode := episodes[0]
 
 		p.logger.Debug().
 			Str("path", path).
+			Int("episodes_count", len(episodes)).
 			Str("title", latestEpisode.Title).
 			Time("published_at", *latestEpisode.PublishedAt).
 			Msg("latestEpisode is found")
@@ -236,6 +246,7 @@ func (p *Podcaster) Sync() error {
 		feedMap[path] = feed
 	}
 
+	sortEpisodesByPublishedAtDesc(allEpisodes)
 	feed, err := encodePodcastToXML(
 		&Podcast{
 			Title:       fmt.Sprintf("%s(ALL)", p.title),
