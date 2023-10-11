@@ -67,10 +67,14 @@ func NewHTTPHandler(
 
 	e.GET("/:program_path/rss.xml", func(c echo.Context) error {
 		programPath := c.Param("program_path")
+		feed, ok := podcaster.GetFeed(programPath)
+		if !ok {
+			return c.String(http.StatusNotFound, "")
+		}
 		return c.Blob(
 			http.StatusOK,
 			"application/xml",
-			[]byte(podcaster.GetFeed(programPath)),
+			[]byte(feed),
 		)
 	})
 
