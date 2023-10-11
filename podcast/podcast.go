@@ -171,7 +171,8 @@ func (p *Podcaster) Sync() error {
 			ep.ImageURL = md.ImageURL
 			ep.PodcastTitle = md.PodcastTitle
 
-			podcastPath = md.Path
+			// NOTE: `/ann` のような設定を `ann` と同値にしてあげる
+			podcastPath = strings.ToLower(strings.TrimPrefix(md.Path, "/"))
 		}
 
 		allEpisodes = append(allEpisodes, ep)
@@ -198,9 +199,6 @@ func (p *Podcaster) Sync() error {
 		if len(episodes) == 0 {
 			continue
 		}
-
-		// NOTE: `/ann` のような設定を `ann` と同値にしてあげる
-		path = strings.ToLower(strings.TrimPrefix(path, "/"))
 
 		sortEpisodesByPublishedAtDesc(episodes)
 		latestEpisode := episodes[0]
