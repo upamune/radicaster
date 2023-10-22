@@ -180,7 +180,7 @@ func (r *Recorder) RecordAll() (err error) {
 					client,
 					true,
 					&prog,
-					prog.Title,
+					station.Name,
 					zenrokuConfig.Stations[stationID].ImageURL,
 					station.ID,
 					zenrokuConfig.Encoding,
@@ -295,7 +295,7 @@ func (r *Recorder) recordByStartTime(
 	client *radiko.Client,
 	zenrokuMode bool,
 	program *radiko.Prog,
-	title, imageURL, stationID, encoding, path string,
+	podcastTitle, imageURL, stationID, encoding, path string,
 	from time.Time,
 ) error {
 	logger.Info().
@@ -330,7 +330,7 @@ func (r *Recorder) recordByStartTime(
 			fmt.Sprintf(
 				"failed to get m3u8: %s %s %s",
 				stationID,
-				title,
+				podcastTitle,
 				from.Format(time.DateOnly),
 			))
 	}
@@ -415,7 +415,7 @@ func (r *Recorder) recordByStartTime(
 			PublishedAt:  from,
 			ImageURL:     imageURL,
 			Path:         path,
-			PodcastTitle: title,
+			PodcastTitle: podcastTitle,
 			ZenrokuMode:  zenrokuMode,
 		},
 	); err != nil {
