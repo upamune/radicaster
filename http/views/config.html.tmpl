@@ -11,17 +11,18 @@
         </header>
         <main>
             <article>
+                <h3>Programs</h3>
                 <table>
                     <thead>
                         <tr>
                             <th scope="col">Index</th>
                             <th scope="col">Image</th>
                             <th scope="col">Title</th>
-                            <th scope="col">Path</th>
                             <th scope="col">Cron</th>
                             <th scope="col">Station</th>
                             <th scope="col">Start</th>
                             <th scope="col">Encoding</th>
+                            <th scope="col">Path</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -29,22 +30,76 @@
                           <td>-</td>
                           <td>-</td>
                           <td>All</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td>-</td>
                           <td><a href="/all/rss.xml">/all</a></td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>-</td>
                         </tr>
                         {{ range $i, $p := .Programs }}
                         <tr>
                           <td>{{ inc $i }}</td>
-                          <td><img src="{{ $p.ImageURL }}" width="100px" /></td>
+                          <td>
+                          {{ if ne $p.ImageURL "" }}
+                            <img src="{{ $p.ImageURL }}" width="100px" />
+                          {{ else }}
+                            -
+                          {{ end }}
+                          </td>
                           <td>{{ $p.Title }}</td>
-                          <td><a href="{{ if ne $p.Path "" }}/{{ $p.Path }}/rss.xml{{ else }}/rss.xml{{ end }}">/{{ $p.Path }}</a></td>
                           <td>{{ $p.Cron }}</td>
                           <td>{{ $p.StationID }}</td>
                           <td>{{ $p.Start }}</td>
                           <td>{{ $p.Encoding }}</td>
+                          <td><a href="{{ if ne $p.Path "" }}/{{ $p.Path }}/rss.xml{{ else }}/rss.xml{{ end }}">/{{ $p.Path }}</a></td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+                <h3>Zenroku</h3>
+                <ul>
+                    <li>Enable: {{ .Zenroku.Enable }}</li>
+                    {{ if .Zenroku.Enable }}
+                        <li>Cron: {{ .Zenroku.Cron }}</li>
+                        <li>Encoding: {{ .Zenroku.Encoding }}</li>
+                    {{ end }}
+                </ul>
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Index</th>
+                            <th scope="col">Image</th>
+                            <th scope="col">ID</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Enabled</th>
+                            <th scope="col">Path</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range $i, $s := .ZenrokuStations }}
+                        <tr>
+                          <td>{{ inc $i }}</td>
+                          <td>
+                          {{ if ne $s.ImageURL "" }}
+                            <img src="{{ $s.ImageURL }}" width="100px" />
+                          {{ end }}
+                          </td>
+                          <td>{{ $s.ID }}</td>
+                          <td>{{ $s.Name }}</td>
+                          <td>
+                          {{ if $s.Enabled }}
+                          ✅
+                          {{ else }}
+                          -
+                          {{ end }}
+                          </td>
+                          <td>
+                            {{ if $s.Enabled }}
+                                <a href="{{ $s.Path }}/rss.xml">{{ $s.Path }}</a>
+                            {{ else }}
+                                -
+                            {{ end }}
+                          </td>
                         </tr>
                         {{ end }}
                     </tbody>

@@ -16,6 +16,7 @@ type EpisodeMetadata struct {
 	ImageURL     string    `json:"image_url"`
 	Path         string    `json:"path"`
 	PodcastTitle string    `json:"podcast_title"`
+	ZenrokuMode  bool      `json:"zenroku_mode"`
 }
 
 func buildMetadataPath(base string) string {

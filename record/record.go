@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,10 +43,16 @@ type Recorder struct {
 	config         struct {
 		sync.RWMutex
 		config.Config
+		enableStationIDMap map[string]struct{}
 	}
 }
 
-func NewRecorder(logger zerolog.Logger, targetDir string, initConfig config.Config, configFilePath string) (*Recorder, error) {
+func NewRecorder(
+	logger zerolog.Logger,
+	targetDir string,
+	initConfig config.Config,
+	configFilePath string,
+) (*Recorder, error) {
 	httpClient := retryablehttp.NewClient()
 	httpClient.Logger = nil
 	httpClient.RequestLogHook = func(_ retryablehttp.Logger, request *http.Request, i int) {
@@ -70,13 +77,128 @@ func NewRecorder(logger zerolog.Logger, targetDir string, initConfig config.Conf
 		targetDir:      targetDir,
 		configFilePath: configFilePath,
 	}
-	r.config.Config = initConfig
-
-	if err := r.restartScheduler(); err != nil {
-		return nil, errors.Wrap(err, "failed to update scheduler")
+	if _, err := r.refreshConfig(initConfig); err != nil {
+		return nil, errors.Wrap(err, "failed to init config")
 	}
 
 	return r, nil
+}
+
+func createEnableStationIDMap(ids []string) map[string]struct{} {
+	m := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id := strings.ToLower(id)
+		m[id] = struct{}{}
+	}
+	return m
+}
+
+func (r *Recorder) RecordAll() (err error) {
+	var (
+		taskStartedTime = time.Now()
+		logger          = r.logger.With().
+				Str("task_id", xid.New().String()).
+				Bool("zenroku_mode", true).
+				Logger()
+
+		// NOTE: 前日の0時から対象にする
+		targetDate = time.Now().
+				In(timeutil.JST()).
+				AddDate(0, 0, -1).
+				Truncate(24 * time.Hour)
+	)
+	logger.Info().
+		Time("task_started_time", taskStartedTime).
+		Time("zenroku_target_date", targetDate).
+		Msg("record_all task started")
+	defer func() {
+		taskFinishedTime := time.Now()
+		logger := logger.With().
+			Time("task_started_time", taskStartedTime).
+			Time("task_finished_time", taskFinishedTime).
+			Dur("task_duration", taskFinishedTime.Sub(taskStartedTime)).Logger()
+
+		if err != nil {
+			logger.Error().Err(err).Msg("record task finished with an error")
+			return
+		}
+		logger.Info().Msg("record_all task finished")
+	}()
+
+	r.config.RLock()
+	zenrokuConfig := r.config.Zenroku
+	r.config.RUnlock()
+
+	ctx := context.Background()
+
+	// NOTE: Radikoのクライアントは毎回初期化しないと、認証エラーになってしまう
+	client, err := radikoutil.NewClient(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to create radiko client")
+	}
+
+	stations, err := client.GetStations(ctx, targetDate)
+	if err != nil {
+		return errors.Wrap(err, "failed to get stations")
+	}
+
+	enabledStationIDMap := lo.Associate(zenrokuConfig.EnableStationIDs, func(stationID string) (string, struct{}) {
+		return strings.ToLower(stationID), struct{}{}
+	})
+	pool := pool.New().WithErrors()
+	for _, station := range stations {
+		station := station
+		if _, ok := enabledStationIDMap[strings.ToLower(station.ID)]; !ok {
+			logger.Info().
+				Strs("enable_station_ids", zenrokuConfig.EnableStationIDs).
+				Str("station_id", station.ID).
+				Str("station_name", station.Name).
+				Msg("skip station because it is not enabled")
+			continue
+		}
+		// NOTE: 番組ごとに並列にすると、並列に走りすぎるのでStationごとに並列化する
+		pool.Go(func() error {
+			logger.Info().
+				Str("station_id", station.ID).
+				Msg("start zenroku station")
+			var errs []error
+			for _, prog := range station.Progs.Progs {
+				prog := prog
+				from, err := time.ParseInLocation(
+					"20060102150405",
+					prog.Ft,
+					timeutil.JST(),
+				)
+				if err != nil {
+					errs = append(errs, err)
+					continue
+				}
+				stationID := strings.ToLower(station.ID)
+				if err := r.recordByStartTime(
+					ctx,
+					logger,
+					client,
+					true,
+					&prog,
+					prog.Title,
+					zenrokuConfig.Stations[stationID].ImageURL,
+					station.ID,
+					zenrokuConfig.Encoding,
+					stationID,
+					from,
+				); err != nil {
+					errs = append(errs, err)
+					continue
+				}
+			}
+			return errors.Join(errs...)
+		})
+	}
+	if err := pool.Wait(); err != nil {
+		return errors.Wrap(err, "failed to record all programs")
+	}
+
+	return nil
 }
 
 func (r *Recorder) Record(p config.Program) (err error) {
@@ -153,6 +275,29 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 			),
 		)
 	}
+	if err := r.recordByStartTime(
+		ctx,
+		logger,
+		client,
+		false,
+		program,
+		p.Title, p.ImageURL, p.StationID, p.Encoding, p.Path,
+		from,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Recorder) recordByStartTime(
+	ctx context.Context,
+	logger zerolog.Logger,
+	client *radiko.Client,
+	zenrokuMode bool,
+	program *radiko.Prog,
+	title, imageURL, stationID, encoding, path string,
+	from time.Time,
+) error {
 	logger.Info().
 		Time("from", from).
 		Str("program_title", program.Title).
@@ -160,11 +305,16 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		Str("program_to", program.To).
 		Msg("program found")
 
+	mode := "normal"
+	if zenrokuMode {
+		mode = "zenroku"
+	}
 	fileName := fmt.Sprintf(
-		"%s_%s.%s",
+		"%s_%s_%s.%s",
 		program.Title,
 		from.Format("2006年01月02日"),
-		p.Encoding,
+		mode,
+		encoding,
 	)
 	output := filepath.Join(r.targetDir, fileName)
 
@@ -173,14 +323,14 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		return nil
 	}
 
-	uri, err := client.TimeshiftPlaylistM3U8(ctx, p.StationID, from)
+	uri, err := client.TimeshiftPlaylistM3U8(ctx, stationID, from)
 	if err != nil {
 		return errors.Wrap(
 			err,
 			fmt.Sprintf(
 				"failed to get m3u8: %s %s %s",
-				p.StationID,
-				p.Title,
+				stationID,
+				title,
 				from.Format(time.DateOnly),
 			))
 	}
@@ -223,7 +373,7 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 	}
 	logger.Info().Msg("finished concating aac files")
 
-	switch p.Encoding {
+	switch encoding {
 	case config.AudioFormatAAC:
 		logger.Info().
 			Str("output", output).
@@ -254,7 +404,7 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 		}
 		logger.Info().Msg("finish converting aac to mp3")
 	default:
-		return errors.Errorf("unsupported encoding: %s", p.Encoding)
+		return errors.Errorf("unsupported encoding: %s", encoding)
 	}
 
 	if err := metadata.WriteByAudioFilePath(
@@ -263,9 +413,10 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 			Title:        program.Title,
 			Description:  program.Desc,
 			PublishedAt:  from,
-			ImageURL:     p.ImageURL,
-			Path:         p.Path,
-			PodcastTitle: p.Title,
+			ImageURL:     imageURL,
+			Path:         path,
+			PodcastTitle: title,
+			ZenrokuMode:  zenrokuMode,
 		},
 	); err != nil {
 		return errors.Wrap(err, "failed to write metadata")
@@ -316,6 +467,12 @@ func (r *Recorder) restartScheduler() error {
 
 	r.config.RLock()
 	defer r.config.RUnlock()
+	if r.config.Zenroku.Enable {
+		cron := r.config.Zenroku.Cron
+		if _, err := s.Cron(cron).Do(r.RecordAll); err != nil {
+			return errors.Wrapf(err, "failed to set cron: %s", cron)
+		}
+	}
 	for _, p := range r.config.Config.Programs {
 		if _, err := s.Cron(p.Cron).Do(r.Record, p); err != nil {
 			return errors.Wrap(err, "failed to set cron")
@@ -343,6 +500,7 @@ func (r *Recorder) refreshConfig(config config.Config) (config.Config, error) {
 	defer r.logger.Info().Msg("finish refreshing config")
 	r.config.Lock()
 	r.config.Config = config
+	r.config.enableStationIDMap = createEnableStationIDMap(config.Zenroku.EnableStationIDs)
 	r.logger.Debug().Object("config", config).Msg("config updated")
 	r.config.Unlock()
 
