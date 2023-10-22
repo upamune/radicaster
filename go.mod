@@ -10,6 +10,7 @@ require (
 	github.com/goccy/go-yaml v1.11.2
 	github.com/h2non/filetype v1.1.3
 	github.com/hashicorp/go-retryablehttp v0.7.4
+	github.com/jellydator/ttlcache/v3 v3.1.0
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/rs/xid v1.5.0
 	github.com/rs/zerolog v1.31.0
@@ -62,6 +63,7 @@ require (
 	golang.org/x/crypto v0.13.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/net v0.15.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect

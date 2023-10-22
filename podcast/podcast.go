@@ -173,6 +173,9 @@ func (p *Podcaster) Sync() error {
 
 			// NOTE: `/ann` のような設定を `ann` と同値にしてあげる
 			podcastPath = strings.ToLower(strings.TrimPrefix(md.Path, "/"))
+			if md.ZenrokuMode {
+				podcastPath = path.Join("zenroku", podcastPath)
+			}
 		}
 
 		allEpisodes = append(allEpisodes, ep)

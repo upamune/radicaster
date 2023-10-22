@@ -1,28 +1,21 @@
 package record
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/cockroachdb/errors"
 	"github.com/rs/zerolog"
 	"github.com/upamune/radicaster/config"
-	"github.com/upamune/radicaster/radikoutil"
 	"github.com/upamune/radicaster/timeutil"
 )
 
 func TestNewRecord(t *testing.T) {
-	ctx := context.Background()
-	c, err := radikoutil.NewClient(ctx)
-	if err != nil {
-		t.Fatalf("%+v\n", errors.WithStack(err))
-	}
-
 	r, err := NewRecorder(
 		zerolog.New(zerolog.NewConsoleWriter()).Level(zerolog.DebugLevel),
-		c,
 		t.TempDir(),
+		false,
+		"",
 		config.Config{
 			Programs: []config.Program{},
 		},
@@ -40,6 +33,17 @@ func TestNewRecord(t *testing.T) {
 		Start:     "0300",
 		Encoding:  config.AudioFormatAAC,
 	}); err != nil {
+		t.Fatalf("%+v\n", errors.WithStack(err))
+	}
+}
+
+func TestRecorder_RecordAll(t *testing.T) {
+	t.Parallel()
+	r, err := NewRecorder(zerolog.Nop(), t.TempDir(), true, "", config.Config{}, "")
+	if err != nil {
+		t.Fatalf("%+v\n", errors.WithStack(err))
+	}
+	if err := r.RecordAll(); err != nil {
 		t.Fatalf("%+v\n", errors.WithStack(err))
 	}
 }

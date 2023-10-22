@@ -16,21 +16,38 @@ import (
 const (
 	AudioFormatAAC = "aac"
 	AudioFormatMP3 = "mp3"
+
+	zenrokuDefaultCronExpression = "0 3 * * *"
 )
 
 type Config struct {
 	Programs []Program `yaml:"programs" json:"programs"`
+	Zenroku  Zenroku   `yaml:"zenroku" json:"zenroku"`
+}
+
+type Stations map[string]Station
+
+type Zenroku struct {
+	Enable           bool     `yaml:"enable" json:"enable"`
+	Cron             string   `yaml:"cron" json:"cron"`
+	Encoding         string   `yaml:"encoding" json:"encoding"`
+	Stations         Stations `yaml:"stations" json:"stations"`
+	EnableStationIDs []string `yaml:"enable_stations" json:"enable_stations"`
+}
+
+type Station struct {
+	ImageURL string `yaml:"image_url" json:"image_url"`
 }
 
 type Program struct {
-	Title     string             `yaml:"title,omitempty" json:"title,omitempty"`
+	Title     string             `yaml:"title" json:"title"`
 	Weekdays  []timeutil.Weekday `yaml:"weekdays" json:"weekdays"`
 	Cron      string             `yaml:"cron" json:"cron"`
 	StationID string             `yaml:"station" json:"station"`
 	Start     string             `yaml:"start" json:"start"`
-	Encoding  string             `yaml:"encoding,omitempty" json:"encoding,omitempty"`
-	ImageURL  string             `yaml:"image_url,omitempty" json:"image_url,omitempty"`
-	Path      string             `yaml:"path,omitempty" json:"path,omitempty"`
+	Encoding  string             `yaml:"encoding" json:"encoding"`
+	ImageURL  string             `yaml:"image_url" json:"image_url"`
+	Path      string             `yaml:"path" json:"path"`
 }
 
 func Parse(r io.Reader) (Config, error) {
@@ -42,6 +59,17 @@ func Parse(r io.Reader) (Config, error) {
 		if c.Programs[i].Encoding == "" {
 			c.Programs[i].Encoding = AudioFormatAAC
 		}
+	}
+	if c.Zenroku.Cron == "" {
+		c.Zenroku.Cron = zenrokuDefaultCronExpression
+	}
+	if c.Zenroku.Encoding == "" {
+		c.Zenroku.Encoding = AudioFormatAAC
+	}
+	for k, v := range c.Zenroku.Stations {
+		k, v := k, v
+		// NOTE: 小文字でも引けるようにする
+		c.Zenroku.Stations[strings.ToLower(k)] = v
 	}
 	return c, nil
 }
@@ -85,6 +113,24 @@ func Init(configFilePath *string, configURL *string) (Config, error) {
 	}
 
 	return Config{}, nil
+}
+
+func (s Station) MarshalZerologObject(e *zerolog.Event) {
+	e.Str("image_url", s.ImageURL)
+}
+
+func (s Stations) MarshalZerologObject(e *zerolog.Event) {
+	for sid, s := range s {
+		e.Object(sid, s)
+	}
+}
+
+func (z Zenroku) MarshalZerologObject(e *zerolog.Event) {
+	e.Str("cron", z.Cron).
+		Str("encoding", z.Encoding).
+		Bool("enable", z.Enable).
+		Strs("enable_station_ids", z.EnableStationIDs).
+		Object("stations", z.Stations)
 }
 
 func (p Program) MarshalZerologObject(e *zerolog.Event) {

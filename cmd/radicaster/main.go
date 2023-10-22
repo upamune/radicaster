@@ -139,7 +139,12 @@ func realMain() int {
 	}
 
 	ctx := context.Background()
-	recorder, err := record.NewRecorder(logger, *targetDir, initConfig, lo.FromPtrOr(programConfig, ""))
+	recorder, err := record.NewRecorder(
+		logger,
+		*targetDir,
+		initConfig,
+		lo.FromPtrOr(programConfig, ""),
+	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create recorder")
 		return 1
