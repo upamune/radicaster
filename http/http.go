@@ -19,6 +19,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/samber/lo"
+	"github.com/samber/mo"
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/podcast"
 	"github.com/upamune/radicaster/radikoutil"
@@ -34,6 +35,7 @@ func NewHTTPHandler(
 	version, revision string,
 	podcaster *podcast.Podcaster,
 	recorder *record.Recorder,
+	radikoClientManager *radikoutil.ClientManager,
 	targetDir string,
 	basicAuth string,
 ) (http.Handler, error) {
@@ -173,11 +175,7 @@ func NewHTTPHandler(
 				logger.Debug().
 					Str("cache_key", radikoCacheKey).
 					Msg("radiko cache no-hit")
-				client, err := radikoutil.NewClient(ctx)
-				if err != nil {
-					return c.String(http.StatusInternalServerError, err.Error())
-				}
-				stations, err = client.GetStations(ctx, time.Now())
+				stations, err := getZenrokuStations(ctx, radikoClientManager, config.Zenroku.AreaIDs)
 				if err != nil {
 					return c.String(http.StatusInternalServerError, err.Error())
 				}
@@ -261,4 +259,44 @@ func NewHTTPHandler(
 	e.Static("/static", targetDir)
 
 	return e, nil
+}
+
+func getZenrokuStations(ctx context.Context, radikoClientManager *radikoutil.ClientManager, areaIDs []string) (radiko.Stations, error) {
+	if len(areaIDs) == 0 {
+		client, err := radikoClientManager.Get(
+			ctx,
+			mo.None[string](),
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create radiko client")
+		}
+		stations, err := client.GetStations(ctx, time.Now())
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get stations")
+		}
+		return stations, nil
+	}
+
+	stationMap := make(map[string]radiko.Station)
+	for _, stationID := range lo.Uniq(areaIDs) {
+		client, err := radikoClientManager.Get(
+			ctx,
+			mo.Some(stationID),
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create radiko client")
+		}
+		stations, err := client.GetStations(ctx, time.Now())
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get stations")
+		}
+		for _, s := range stations {
+			s := s
+			stationMap[s.ID] = s
+		}
+	}
+
+	return lo.MapToSlice(stationMap, func(_ string, station radiko.Station) radiko.Station {
+		return station
+	}), nil
 }

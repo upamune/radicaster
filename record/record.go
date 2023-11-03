@@ -18,6 +18,7 @@ import (
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"github.com/samber/lo"
+	"github.com/samber/mo"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/ffmpeg"
@@ -29,8 +30,9 @@ import (
 )
 
 type Recorder struct {
-	httpClient *retryablehttp.Client
-	logger     zerolog.Logger
+	radikoClientManager *radikoutil.ClientManager
+	httpClient          *retryablehttp.Client
+	logger              zerolog.Logger
 
 	targetDir string
 
@@ -52,6 +54,7 @@ func NewRecorder(
 	targetDir string,
 	initConfig config.Config,
 	configFilePath string,
+	radikoClientManger *radikoutil.ClientManager,
 ) (*Recorder, error) {
 	httpClient := retryablehttp.NewClient()
 	httpClient.Logger = nil
@@ -72,10 +75,11 @@ func NewRecorder(
 			Msg("response_log_hook")
 	}
 	r := &Recorder{
-		httpClient:     httpClient,
-		logger:         logger,
-		targetDir:      targetDir,
-		configFilePath: configFilePath,
+		httpClient:          httpClient,
+		logger:              logger,
+		targetDir:           targetDir,
+		configFilePath:      configFilePath,
+		radikoClientManager: radikoClientManger,
 	}
 	if _, err := r.refreshConfig(initConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to init config")
@@ -132,7 +136,7 @@ func (r *Recorder) RecordAll() (err error) {
 	ctx := context.Background()
 
 	// NOTE: Radikoのクライアントは毎回初期化しないと、認証エラーになってしまう
-	client, err := radikoutil.NewClient(ctx)
+	client, err := r.radikoClientManager.Get(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to create radiko client")
 	}
@@ -260,7 +264,7 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 	}
 
 	// NOTE: Radikoのクライアントは毎回初期化しないと、認証エラーになってしまう
-	client, err := radikoutil.NewClient(ctx)
+	client, err := r.radikoClientManager.Get(ctx, mo.EmptyableToOption(p.AreaID))
 	if err != nil {
 		return errors.Wrap(err, "failed to create radiko client")
 	}

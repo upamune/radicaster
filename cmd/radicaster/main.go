@@ -13,9 +13,11 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 	"github.com/samber/lo"
+	"github.com/samber/mo"
 	"github.com/upamune/radicaster/config"
 	"github.com/upamune/radicaster/http"
 	"github.com/upamune/radicaster/podcast"
+	"github.com/upamune/radicaster/radikoutil"
 	"github.com/upamune/radicaster/record"
 )
 
@@ -35,6 +37,8 @@ func realMain() int {
 	programConfig := flag.String("config", "", "path for config")
 	programConfigURL := flag.String("configurl", "", "url for config")
 	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
+	radikoEmail := flag.String("radikoemail", "", "email for radiko")
+	radikoPassword := flag.String("radikopassword", "", "password for radiko")
 	debug := flag.Bool("debug", false, "debug mode")
 	trace := flag.Bool("trace", false, "trace mode")
 	flag.Parse()
@@ -138,19 +142,38 @@ func realMain() int {
 		return 1
 	}
 
+	radikoClientManager, err := radikoutil.NewClientManger(
+		mo.EmptyableToOption(lo.FromPtr(radikoEmail)),
+		mo.EmptyableToOption(lo.FromPtr(radikoPassword)),
+	)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to create radiko client manager")
+		return 1
+	}
+
 	ctx := context.Background()
 	recorder, err := record.NewRecorder(
 		logger,
 		*targetDir,
 		initConfig,
 		lo.FromPtrOr(programConfig, ""),
+		radikoClientManager,
 	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create recorder")
 		return 1
 	}
 
-	handler, err := http.NewHTTPHandler(logger, Version, Revision, podcaster, recorder, *targetDir, *basicAuth)
+	handler, err := http.NewHTTPHandler(
+		logger,
+		Version,
+		Revision,
+		podcaster,
+		recorder,
+		radikoClientManager,
+		*targetDir,
+		*basicAuth,
+	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create HTTP handler")
 		return 1

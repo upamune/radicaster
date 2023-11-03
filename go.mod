@@ -15,6 +15,7 @@ require (
 	github.com/rs/xid v1.5.0
 	github.com/rs/zerolog v1.31.0
 	github.com/samber/lo v1.38.1
+	github.com/samber/mo v1.11.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/yyoshiki41/go-radiko v0.9.0
 	github.com/yyoshiki41/radigo v0.12.0

@@ -32,6 +32,7 @@ type Zenroku struct {
 	Cron             string   `yaml:"cron" json:"cron"`
 	Encoding         string   `yaml:"encoding" json:"encoding"`
 	Stations         Stations `yaml:"stations" json:"stations"`
+	AreaIDs          []string `json:"area_ids" yaml:"area_ids"`
 	EnableStationIDs []string `yaml:"enable_stations" json:"enable_stations"`
 }
 
@@ -43,6 +44,7 @@ type Program struct {
 	Title     string             `yaml:"title" json:"title"`
 	Weekdays  []timeutil.Weekday `yaml:"weekdays" json:"weekdays"`
 	Cron      string             `yaml:"cron" json:"cron"`
+	AreaID    string             `yaml:"area_id" json:"area_id"`
 	StationID string             `yaml:"station" json:"station"`
 	Start     string             `yaml:"start" json:"start"`
 	Encoding  string             `yaml:"encoding" json:"encoding"`
@@ -129,7 +131,6 @@ func (z Zenroku) MarshalZerologObject(e *zerolog.Event) {
 	e.Str("cron", z.Cron).
 		Str("encoding", z.Encoding).
 		Bool("enable", z.Enable).
-		Strs("enable_station_ids", z.EnableStationIDs).
 		Object("stations", z.Stations)
 }
 
