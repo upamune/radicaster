@@ -43,6 +43,7 @@ type Program struct {
 	Title     string             `yaml:"title" json:"title"`
 	Weekdays  []timeutil.Weekday `yaml:"weekdays" json:"weekdays"`
 	Cron      string             `yaml:"cron" json:"cron"`
+	AreaID    string             `yaml:"area_id,omitempty" json:"area_id,omitempty"`
 	StationID string             `yaml:"station" json:"station"`
 	Start     string             `yaml:"start" json:"start"`
 	Encoding  string             `yaml:"encoding" json:"encoding"`
