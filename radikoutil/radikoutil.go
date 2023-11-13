@@ -52,15 +52,8 @@ func NewClient(ctx context.Context, opts ...Option) (*radiko.Client, error) {
 		return nil, errors.Wrap(err, "failed to get current areaID via API")
 	}
 
-	if opt.areaID != "" {
-		c.SetAreaID(opt.areaID)
-	} else {
-		// NOTE: エリアIDが指定されてない時は今のエリアのIDにする
-		c.SetAreaID(currentAreaID)
-	}
-
 	// NOTE: プレミアム会員かつ、現在のエリア外の時はログインする
-	if opt.isPremium && isCurrentAreaID(currentAreaID, opt.areaID) {
+	if opt.isPremium && !isCurrentAreaID(currentAreaID, opt.areaID) {
 		status, err := c.Login(ctx, opt.email, opt.password)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to login to radiko")
@@ -68,6 +61,7 @@ func NewClient(ctx context.Context, opts ...Option) (*radiko.Client, error) {
 		if status.StatusCode() != 200 {
 			return nil, errors.Errorf("failed to login to radiko: %d", status.StatusCode())
 		}
+		c.SetAreaID(opt.areaID)
 	}
 
 	if _, err := c.AuthorizeToken(ctx); err != nil {
