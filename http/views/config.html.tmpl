@@ -19,6 +19,7 @@
                             <th scope="col">Image</th>
                             <th scope="col">Title</th>
                             <th scope="col">Cron</th>
+                            <th scope="col">Area</th>
                             <th scope="col">Station</th>
                             <th scope="col">Start</th>
                             <th scope="col">Encoding</th>
@@ -30,6 +31,7 @@
                           <td>-</td>
                           <td>-</td>
                           <td>All</td>
+                          <td>-</td>
                           <td>-</td>
                           <td>-</td>
                           <td>-</td>
@@ -48,6 +50,13 @@
                           </td>
                           <td>{{ $p.Title }}</td>
                           <td>{{ $p.Cron }}</td>
+                          <td>
+                          {{ if ne $p.AreaID "" }}
+                            {{ $p.AreaID }}
+                          {{ else }}
+                            -
+                          {{ end }}
+                          </td>
                           <td>{{ $p.StationID }}</td>
                           <td>{{ $p.Start }}</td>
                           <td>{{ $p.Encoding }}</td>
