@@ -37,6 +37,8 @@ func realMain() int {
 	podcastImageURL := flag.String("podcastimageurl", "", "url for podcast image")
 	debug := flag.Bool("debug", false, "debug mode")
 	trace := flag.Bool("trace", false, "trace mode")
+	radikoEmail := flag.String("radikoemail", "", "email for radiko")
+	radikoPassword := flag.String("radikopassword", "", "password for radiko")
 	flag.Parse()
 
 	if baseURL == nil || *baseURL == "" {
@@ -142,8 +144,10 @@ func realMain() int {
 	recorder, err := record.NewRecorder(
 		logger,
 		*targetDir,
+		lo.FromPtr(radikoEmail),
+		lo.FromPtr(radikoPassword),
 		initConfig,
-		lo.FromPtrOr(programConfig, ""),
+		lo.FromPtr(programConfig),
 	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create recorder")

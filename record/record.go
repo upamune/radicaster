@@ -39,8 +39,9 @@ type Recorder struct {
 		*gocron.Scheduler
 	}
 
-	configFilePath string
-	config         struct {
+	radikoEmail, radikoPassword string
+	configFilePath              string
+	config                      struct {
 		sync.RWMutex
 		config.Config
 		enableStationIDMap map[string]struct{}
@@ -50,6 +51,7 @@ type Recorder struct {
 func NewRecorder(
 	logger zerolog.Logger,
 	targetDir string,
+	radikoEmail, radikoPassword string,
 	initConfig config.Config,
 	configFilePath string,
 ) (*Recorder, error) {
@@ -75,6 +77,8 @@ func NewRecorder(
 		httpClient:     httpClient,
 		logger:         logger,
 		targetDir:      targetDir,
+		radikoEmail:    radikoEmail,
+		radikoPassword: radikoPassword,
 		configFilePath: configFilePath,
 	}
 	if _, err := r.refreshConfig(initConfig); err != nil {
@@ -260,7 +264,11 @@ func (r *Recorder) record(ctx context.Context, logger zerolog.Logger, now time.T
 	}
 
 	// NOTE: Radikoのクライアントは毎回初期化しないと、認証エラーになってしまう
-	client, err := radikoutil.NewClient(ctx)
+	client, err := radikoutil.NewClient(
+		ctx,
+		radikoutil.WithAreaID(p.AreaID),
+		radikoutil.WithPremium(r.radikoEmail, r.radikoPassword),
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create radiko client")
 	}

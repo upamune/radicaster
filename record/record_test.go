@@ -14,7 +14,7 @@ func TestNewRecord(t *testing.T) {
 	r, err := NewRecorder(
 		zerolog.New(zerolog.NewConsoleWriter()).Level(zerolog.DebugLevel),
 		t.TempDir(),
-		false,
+		"",
 		"",
 		config.Config{
 			Programs: []config.Program{},
@@ -39,7 +39,7 @@ func TestNewRecord(t *testing.T) {
 
 func TestRecorder_RecordAll(t *testing.T) {
 	t.Parallel()
-	r, err := NewRecorder(zerolog.Nop(), t.TempDir(), true, "", config.Config{}, "")
+	r, err := NewRecorder(zerolog.Nop(), t.TempDir(), "", "", config.Config{}, "")
 	if err != nil {
 		t.Fatalf("%+v\n", errors.WithStack(err))
 	}
