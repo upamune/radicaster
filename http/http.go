@@ -72,13 +72,16 @@ func NewHTTPHandler(
 	})
 
 	e.GET("/rss.xml", func(c echo.Context) error {
-		return c.Blob(http.StatusOK, "application/xml", []byte(podcaster.GetDefaultFeed()))
+		since := c.QueryParam("since")
+		feed := podcaster.GetDefaultFeedWithSince(since)
+		return c.Blob(http.StatusOK, "application/xml", []byte(feed))
 	})
 
 	e.GET("/zenroku/:program_path/rss.xml", func(c echo.Context) error {
 		programPath := c.Param("program_path")
+		since := c.QueryParam("since")
 		p := path.Join("zenroku", programPath)
-		feed, ok := podcaster.GetFeed(p)
+		feed, ok := podcaster.GetFeedWithSince(p, since)
 		if !ok {
 			return c.String(http.StatusNotFound, "")
 		}
@@ -91,7 +94,8 @@ func NewHTTPHandler(
 
 	e.GET("/:program_path/rss.xml", func(c echo.Context) error {
 		programPath := c.Param("program_path")
-		feed, ok := podcaster.GetFeed(programPath)
+		since := c.QueryParam("since")
+		feed, ok := podcaster.GetFeedWithSince(programPath, since)
 		if !ok {
 			return c.String(http.StatusNotFound, "")
 		}
