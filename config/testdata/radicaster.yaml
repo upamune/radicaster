@@ -1,0 +1,19 @@
+programs:
+- title: ""
+  weekdays:
+    - Sunday
+    - Monday
+    - Tuesday
+  cron: "10 3 * * 6"
+  station: LFR
+  start: "0100"
+  encoding: aac
+  image_url: http://example.com/image.png
+- title: ""
+  weekdays:
+    - Friday
+  cron: "40 4 * * 2"
+  station: LFR
+  start: "0300"
+  encoding: mp3
+zenroku:

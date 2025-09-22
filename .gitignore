@@ -3,5 +3,6 @@
 /tmp
 .DS_Store
 *.yaml
+!config/testdata/*.yaml
 *.aac
 *.mp3
