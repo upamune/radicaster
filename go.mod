@@ -1,6 +1,6 @@
 module github.com/upamune/radicaster
 
-go 1.21
+go 1.25
 
 require (
 	github.com/cockroachdb/errors v1.11.1
