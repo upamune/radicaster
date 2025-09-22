@@ -35,6 +35,13 @@ func TestParse(t *testing.T) {
 				Encoding:  "mp3",
 			},
 		},
+		Zenroku: Zenroku{
+			Enable:           false,
+			Cron:             "0 3 * * *",
+			Encoding:         "aac",
+			Stations:         nil,
+			EnableStationIDs: nil,
+		},
 	}
 	tests := map[string]struct {
 		filename string
