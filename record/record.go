@@ -628,6 +628,12 @@ func (r *Recorder) executeAdHocRecording(ctx context.Context, task *AdHocTask) {
 	}
 
 	// Radikoクライアント初期化（毎回必要！）
+	isPremium := r.radikoEmail != "" && r.radikoPassword != ""
+	logger.Info().
+		Bool("is_premium", isPremium).
+		Str("radiko_email", r.radikoEmail).
+		Msg("initializing radiko client for adhoc recording")
+
 	client, err := radikoutil.NewClient(
 		ctx,
 		radikoutil.WithAreaID(task.AreaID),
@@ -643,6 +649,13 @@ func (r *Recorder) executeAdHocRecording(ctx context.Context, task *AdHocTask) {
 	}
 
 	// 番組情報取得
+	logger.Info().
+		Str("station_id", task.StationID).
+		Time("from_utc", task.From).
+		Time("from_jst", task.From.In(timeutil.JST())).
+		Str("from_format", task.From.In(timeutil.JST()).Format("2006-01-02 15:04:05")).
+		Msg("calling GetProgramByStartTime")
+
 	program, err := client.GetProgramByStartTime(ctx, task.StationID, task.From)
 	if err != nil {
 		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
@@ -658,6 +671,11 @@ func (r *Recorder) executeAdHocRecording(ctx context.Context, task *AdHocTask) {
 		Str("program_ft", program.Ft).
 		Str("program_to", program.To).
 		Msg("program found")
+
+	// タスクに番組名を設定
+	r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+		t.ProgramTitle = program.Title
+	})
 
 	// ファイル名生成
 	fileName := fmt.Sprintf(
@@ -776,12 +794,13 @@ func (r *Recorder) executeAdHocRecording(ctx context.Context, task *AdHocTask) {
 	}
 
 	// メタデータ書き込み（Path="adhoc"）
+	// PublishedAt は録音日時（今）に設定することで、RSSフィードで最新に表示される
 	if err := metadata.WriteByAudioFilePath(
 		output,
 		metadata.EpisodeMetadata{
 			Title:        program.Title,
 			Description:  program.Desc,
-			PublishedAt:  task.From,
+			PublishedAt:  time.Now(),
 			ImageURL:     "",
 			Path:         "adhoc",
 			PodcastTitle: "アドホック録音",

@@ -55,54 +55,88 @@ func handleGetPrograms(
 ) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		areaID := c.QueryParam("area_id")
-		dateStr := c.QueryParam("date")
-
-		var targetDate time.Time
-		if dateStr == "" {
-			targetDate = time.Now().In(timeutil.JST())
-		} else {
-			var err error
-			targetDate, err = time.Parse("2006-01-02", dateStr)
-			if err != nil {
-				return c.String(http.StatusBadRequest, "Invalid date format")
-			}
-		}
-
 		ctx := c.Request().Context()
 
-		// キャッシュキー生成
-		cacheKey := fmt.Sprintf("%s:%s", areaID, targetDate.Format("2006-01-02"))
-		stations, ok := programCache.Get(cacheKey)
+		c.Logger().Infof("handleGetPrograms called with area_id='%s' (len=%d)", areaID, len(areaID))
 
-		if !ok {
-			// Radikoクライアント初期化
+		// 過去7日間の番組を取得
+		now := time.Now().In(timeutil.JST())
+		var allStationsWithDate []stationWithDate
+
+		// エリアIDが空の場合、現在地を自動検出
+		actualAreaID := areaID
+		if areaID == "" {
+			c.Logger().Infof("areaID is empty, detecting area...")
 			client, err := radikoutil.NewClient(
 				ctx,
-				radikoutil.WithAreaID(areaID),
 				radikoutil.WithPremium(radikoEmail, radikoPassword),
 			)
 			if err != nil {
-				return c.String(http.StatusInternalServerError, err.Error())
+				c.Logger().Errorf("failed to create radiko client for area detection: %v", err)
+				return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+					"error": "Failed to detect area",
+				})
 			}
-
-			stations, err = client.GetStations(ctx, targetDate)
-			if err != nil {
-				return c.String(http.StatusInternalServerError, err.Error())
-			}
-
-			programCache.Set(cacheKey, stations)
+			actualAreaID = client.AreaID()
+			c.Logger().Infof("detected area ID: %s", actualAreaID)
 		}
+
+		for i := 0; i < 7; i++ {
+			targetDate := now.AddDate(0, 0, -i)
+
+			// キャッシュキー生成
+			cacheKey := fmt.Sprintf("%s:%s", areaID, targetDate.Format("2006-01-02"))
+			stations, ok := programCache.Get(cacheKey)
+
+			if !ok {
+				// Radikoクライアント初期化
+				client, err := radikoutil.NewClient(
+					ctx,
+					radikoutil.WithAreaID(areaID),
+					radikoutil.WithPremium(radikoEmail, radikoPassword),
+				)
+				if err != nil {
+					c.Logger().Errorf("failed to create radiko client for date %s: %v", targetDate.Format("2006-01-02"), err)
+					continue
+				}
+
+				stations, err = client.GetStations(ctx, targetDate)
+				if err != nil {
+					c.Logger().Errorf("failed to get stations for date %s: %v", targetDate.Format("2006-01-02"), err)
+					continue
+				}
+
+				programCache.Set(cacheKey, stations)
+			}
+
+			// 日付情報を付加
+			for _, station := range stations {
+				allStationsWithDate = append(allStationsWithDate, stationWithDate{
+					Station: station,
+					Date:    targetDate,
+					AreaID:  actualAreaID,
+				})
+			}
+		}
+
+		c.Logger().Infof("fetched %d stations with dates, actualAreaID='%s'", len(allStationsWithDate), actualAreaID)
 
 		acceptHeader := c.Request().Header.Get("Accept")
 		if acceptHeader == "application/json" {
 			return c.JSON(http.StatusOK, map[string]interface{}{
-				"stations": stations,
+				"stations": allStationsWithDate,
 			})
 		}
 
 		// HTML fragment を返す（htmx用）
-		return renderProgramTable(c, stations, areaID, targetDate)
+		return renderProgramTable(c, allStationsWithDate, actualAreaID)
 	}
+}
+
+type stationWithDate struct {
+	Station radiko.Station
+	Date    time.Time
+	AreaID  string
 }
 
 // handleAdHocRecord はアドホック録音を開始
@@ -123,7 +157,8 @@ func handleAdHocRecord(recorder *record.Recorder) echo.HandlerFunc {
 
 		c.Logger().Infof("received adhoc request: station_id=%s, from=%s, area_id=%s", req.StationID, req.From, req.AreaID)
 
-		fromTime, err := time.Parse("20060102150405", req.From)
+		// JSTタイムゾーンでパース
+		fromTime, err := time.ParseInLocation("20060102150405", req.From, timeutil.JST())
 		if err != nil {
 			c.Logger().Errorf("failed to parse time %s: %v", req.From, err)
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
@@ -181,12 +216,13 @@ func handleAdHocStatus(recorder *record.Recorder) echo.HandlerFunc {
 }
 
 // renderProgramTable は番組表のHTML fragmentを生成
-func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string, targetDate time.Time) error {
+func renderProgramTable(c echo.Context, stationsWithDate []stationWithDate, areaID string) error {
 	tmpl := `
 <div class="overflow-x-auto">
 	<table class="min-w-full bg-white border border-gray-300">
 		<thead class="bg-gray-100">
 			<tr>
+				<th class="px-4 py-2 border">日付</th>
 				<th class="px-4 py-2 border">ステーション</th>
 				<th class="px-4 py-2 border">番組</th>
 				<th class="px-4 py-2 border">時間</th>
@@ -194,10 +230,11 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 			</tr>
 		</thead>
 		<tbody>
-			{{range $station := .Stations}}
-				{{range .Progs.Progs}}
-				<tr class="hover:bg-gray-50 program-row" data-title="{{.Title}}" data-station="{{$station.StationName}}">
-					<td class="px-4 py-2 border">{{$station.StationName}}</td>
+			{{range $stationDate := .Stations}}
+				{{range $stationDate.Station.Progs.Progs}}
+				<tr class="hover:bg-gray-50 program-row" data-title="{{.Title}}">
+					<td class="px-4 py-2 border text-sm">{{formatDate .Ft}}</td>
+					<td class="px-4 py-2 border">{{$stationDate.Station.Name}}</td>
 					<td class="px-4 py-2 border">
 						<div class="font-semibold">{{.Title}}</div>
 						<div class="text-sm text-gray-600">{{stripHTML .Desc}}</div>
@@ -209,7 +246,7 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 						{{if isPast .Ft}}
 						<button
 							hx-post="/api/record/adhoc"
-							hx-vals='{"station_id": "{{$station.StationID}}", "from": "{{.Ft}}", "area_id": "{{$station.AreaID}}"}'
+							hx-vals='{"station_id": "{{$stationDate.Station.ID}}", "from": "{{.Ft}}", "area_id": "{{$stationDate.AreaID}}"}'
 							hx-swap="none"
 							hx-on::after-request="htmx.trigger('#task-list', 'taskCreated')"
 							class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm">
@@ -242,6 +279,15 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 			}
 			return timeStr
 		},
+		"formatDate": func(timeStr string) string {
+			// YYYYMMDDhhmmss -> MM/DD
+			if len(timeStr) >= 8 {
+				month := timeStr[4:6]
+				day := timeStr[6:8]
+				return month + "/" + day
+			}
+			return timeStr
+		},
 		"stripHTML": func(s string) string {
 			return strictPolicy.Sanitize(s)
 		},
@@ -262,25 +308,22 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 
 	type templateData struct {
 		Stations []struct {
-			StationID   string
-			StationName string
-			Progs       radiko.Progs
-			AreaID      string
+			Station radiko.Station
+			DateStr string
+			AreaID  string
 		}
 	}
 
 	data := templateData{}
-	for _, station := range stations {
+	for _, sd := range stationsWithDate {
 		data.Stations = append(data.Stations, struct {
-			StationID   string
-			StationName string
-			Progs       radiko.Progs
-			AreaID      string
+			Station radiko.Station
+			DateStr string
+			AreaID  string
 		}{
-			StationID:   station.ID,
-			StationName: station.Name,
-			Progs:       station.Progs,
-			AreaID:      areaID,
+			Station: sd.Station,
+			DateStr: sd.Date.Format("01/02"),
+			AreaID:  areaID,
 		})
 	}
 
@@ -295,35 +338,40 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 // renderTaskList はタスク一覧のHTML fragmentを生成
 func renderTaskList(c echo.Context, tasks []*record.AdHocTask) error {
 	tmpl := `
-<div class="space-y-2">
+<div class="space-y-3">
 	{{range .Tasks}}
-	<div class="bg-white border border-gray-300 rounded-lg p-4">
-		<div class="flex justify-between items-start">
-			<div class="flex-1">
-				<div class="font-semibold">{{.StationID}} - {{.From.Format "2006-01-02 15:04"}}</div>
-				<div class="text-sm text-gray-600 mt-1">タスクID: {{.ID}}</div>
-				{{if ne .FilePath ""}}
-				<div class="text-sm text-gray-600 mt-1">ファイル: {{.FilePath}}</div>
-				{{end}}
-				{{if ne .Error ""}}
-				<div class="text-sm text-red-600 mt-1">エラー: {{.Error}}</div>
-				{{end}}
+	<div class="bg-white border-2 {{if eq .Status "completed"}}border-green-200{{else if eq .Status "failed"}}border-red-200{{else if eq .Status "recording"}}border-blue-200{{else}}border-gray-200{{end}} rounded-lg p-4 shadow-sm">
+		<div class="flex items-start justify-between mb-2">
+			<div class="font-semibold text-gray-900 flex-1">
+				{{if ne .ProgramTitle ""}}{{.ProgramTitle}}{{else}}{{.StationID}}{{end}}
 			</div>
-			<div class="ml-4">
-				{{if eq .Status "pending"}}
-				<span class="inline-block px-3 py-1 text-sm font-semibold text-gray-700 bg-gray-200 rounded-full">待機中</span>
-				{{else if eq .Status "recording"}}
-				<span class="inline-block px-3 py-1 text-sm font-semibold text-blue-700 bg-blue-100 rounded-full">録音中</span>
-				{{else if eq .Status "completed"}}
-				<span class="inline-block px-3 py-1 text-sm font-semibold text-green-700 bg-green-100 rounded-full">完了</span>
-				{{else if eq .Status "failed"}}
-				<span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 rounded-full">失敗</span>
-				{{end}}
-			</div>
+			{{if eq .Status "pending"}}
+			<span class="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded">待機中</span>
+			{{else if eq .Status "recording"}}
+			<span class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded">
+				<svg class="animate-spin -ml-1 mr-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+				</svg>
+				録音中
+			</span>
+			{{else if eq .Status "completed"}}
+			<span class="inline-flex items-center px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded">✓ 完了</span>
+			{{else if eq .Status "failed"}}
+			<span class="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded">✗ 失敗</span>
+			{{end}}
+		</div>
+		<div class="text-sm text-gray-600">
+			<div>{{.StationID}} • {{.From.Format "01/02 15:04"}}</div>
+			{{if ne .Error ""}}
+			<div class="text-red-600 mt-1">{{.Error}}</div>
+			{{end}}
 		</div>
 	</div>
 	{{else}}
-	<div class="text-center text-gray-500 py-8">録音タスクはありません</div>
+	<div class="text-center text-gray-500 py-8 bg-gray-50 rounded-lg">
+		録音タスクはありません
+	</div>
 	{{end}}
 </div>
 `

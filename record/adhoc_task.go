@@ -18,15 +18,16 @@ const (
 )
 
 type AdHocTask struct {
-	ID        string
-	StationID string
-	From      time.Time
-	AreaID    string
-	Status    AdHocTaskStatus
-	Error     string
-	FilePath  string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           string
+	StationID    string
+	From         time.Time
+	AreaID       string
+	Status       AdHocTaskStatus
+	Error        string
+	FilePath     string
+	ProgramTitle string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type AdHocTaskManager struct {
