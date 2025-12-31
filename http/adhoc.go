@@ -109,9 +109,9 @@ func handleGetPrograms(
 func handleAdHocRecord(recorder *record.Recorder) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req struct {
-			StationID string    `json:"station_id"`
-			From      time.Time `json:"from"`
-			AreaID    string    `json:"area_id"`
+			StationID string `json:"station_id"`
+			From      string `json:"from"`
+			AreaID    string `json:"area_id"`
 		}
 
 		if err := c.Bind(&req); err != nil {
@@ -120,10 +120,17 @@ func handleAdHocRecord(recorder *record.Recorder) echo.HandlerFunc {
 			})
 		}
 
+		fromTime, err := time.Parse("20060102150405", req.From)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+				"error": fmt.Sprintf("invalid time format: %v", err),
+			})
+		}
+
 		taskID, err := recorder.RecordAdHoc(
 			c.Request().Context(),
 			req.StationID,
-			req.From,
+			fromTime,
 			req.AreaID,
 		)
 		if err != nil {
