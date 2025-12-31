@@ -6,8 +6,9 @@
     <title>番組表 - Radicaster</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/json-enc.js"></script>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50" hx-ext="json-enc">
     <div class="container mx-auto px-4 py-8">
         <header class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900 mb-4">番組表</h1>

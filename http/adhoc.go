@@ -115,13 +115,17 @@ func handleAdHocRecord(recorder *record.Recorder) echo.HandlerFunc {
 		}
 
 		if err := c.Bind(&req); err != nil {
+			c.Logger().Errorf("failed to bind request: %v", err)
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": err.Error(),
 			})
 		}
 
+		c.Logger().Infof("received adhoc request: station_id=%s, from=%s, area_id=%s", req.StationID, req.From, req.AreaID)
+
 		fromTime, err := time.Parse("20060102150405", req.From)
 		if err != nil {
+			c.Logger().Errorf("failed to parse time %s: %v", req.From, err)
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": fmt.Sprintf("invalid time format: %v", err),
 			})
