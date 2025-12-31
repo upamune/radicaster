@@ -1,0 +1,130 @@
+---
+title: "typescript/no-require-imports | The JavaScript Oxidation Compiler"
+source_url: "https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports"
+fetched_at: "2025-12-31T10:44:14.234719+00:00"
+---
+
+
+
+Are you an LLM? You can read better optimized documentation at /docs/guide/usage/linter/rules/typescript/no-require-imports.md for this page in Markdown format
+
+# typescript/no-require-imports Restriction [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#typescript-no-require-imports)
+
+🚧 An auto-fix is planned for this rule, but not implemented at this time.
+
+### What it does [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#what-it-does)
+
+Forbids the use of CommonJS `require` calls.
+
+### Why is this bad? [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#why-is-this-bad)
+
+`require` imports, while functional in Node.js and older JavaScript environments, are generally considered less desirable than ES modules (`import`) for several key reasons in modern JavaScript development:
+
+1. **Static vs. Dynamic**: `require` is a **runtime** function. It executes when the code runs, which means errors related to missing modules or incorrect paths are only discovered during runtime. ES modules (`import`) are static imports. Their resolution and potential errors are checked during the compilation or bundling process, making them easier to catch during development.
+2. **Code Organization and Readability**: `require` statements are scattered throughout the code, potentially making it harder to quickly identify the dependencies of a given module. `import` statements are typically grouped at the top of a file, improving code organization and readability.
+3. **Tree Shaking and Optimization**: Modern bundlers like Webpack and Rollup use tree-shaking to remove unused code from the final bundle. Tree-shaking works significantly better with ES modules because their dependencies are declared statically and explicitly. `require` makes it harder for bundlers to accurately identify and remove unused code, resulting in larger bundle sizes and slower load times.
+4. **Cyclic Dependencies**: Handling cyclic dependencies (where module A imports B, and B imports A) is significantly more challenging with `require`. ES modules, through their declarative nature and the use of dynamic imports (`import()`), provide better mechanisms to handle cyclic imports and manage asynchronous loading.
+5. **Maintainability and Refactoring**: Changing module names or paths is simpler with ES modules because the changes are declared directly and the compiler or bundler catches any errors. With `require`, you might have to track down all instances of a specific `require` statement for a particular module, making refactoring more error-prone.
+6. Modern JavaScript Standards: import is the standard way to import modules in modern JavaScript, aligned with current best practices and language specifications. Using require necessitates additional build steps or tools to translate it to a format that the browser or modern JavaScript environments can understand.
+7. Error Handling: ES modules provide a more structured way to handle errors during module loading using `try...catch` blocks with dynamic imports, enhancing error management. `require` errors can be less predictable.
+
+In summary, while `require` works, the benefits of ES modules in terms of static analysis, better bundling, improved code organization, and easier maintainability make it the preferred method for importing modules in modern JavaScript projects.
+
+### Examples [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#examples)
+
+Examples of **incorrect** code for this rule:
+
+ts
+
+```
+const lib1 = require("lib1");
+const { lib2 } = require("lib2");
+import lib3 = require("lib3");
+```
+
+Examples of **correct** code for this rule:
+
+ts
+
+```
+import * as lib1 from "lib1";
+import { lib2 } from "lib2";
+import * as lib3 from "lib3";
+```
+
+## Configuration [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#configuration)
+
+This rule accepts a configuration object with the following properties:
+
+### allow [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#allow)
+
+type: `string[]`
+
+default: `[]`
+
+These strings will be compiled into regular expressions with the u flag and be used to test against the imported path. A common use case is to allow importing `package.json`. This is because `package.json` commonly lives outside of the TS root directory, so statically importing it would lead to root directory conflicts, especially with `resolveJsonModule` enabled. You can also use it to allow importing any JSON if your environment doesn't support JSON modules, or use it for other cases where `import` statements cannot work.
+
+With `{ allow: ['/package\\.json$'] }`:
+
+Examples of **correct** code for this rule:
+
+ts
+
+```
+console.log(require("../package.json").version);
+```
+
+### allowAsImport [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#allowasimport)
+
+type: `boolean`
+
+default: `false`
+
+When set to `true`, `import ... = require(...)` declarations won't be reported. This is useful if you use certain module options that require strict CommonJS interop semantics.
+
+When set to `true`:
+
+Examples of **incorrect** code for this rule:
+
+ts
+
+```
+var foo = require("foo");
+const foo = require("foo");
+let foo = require("foo");
+```
+
+Examples of **correct** code for this rule:
+
+ts
+
+```
+import foo = require("foo");
+import foo from "foo";
+```
+
+## How to use [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#how-to-use)
+
+To **enable** this rule using the config file or in the CLI, you can use:
+
+Config (.oxlintrc.json)CLI
+
+json
+
+```
+{
+  "rules": {
+    "typescript/no-require-imports": "error"
+  }
+}
+```
+
+bash
+
+```
+oxlint --deny typescript/no-require-imports
+```
+
+## References [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-require-imports.html#references)
+
+* [Rule Source](https://github.com/oxc-project/oxc/blob/1bf0ffc0f6859c90409a9701e62e8957ef1286cc/crates/oxc_linter/src/rules/typescript/no_require_imports.rs)

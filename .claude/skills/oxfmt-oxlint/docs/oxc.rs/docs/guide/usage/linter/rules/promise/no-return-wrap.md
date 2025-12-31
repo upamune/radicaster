@@ -1,0 +1,155 @@
+---
+title: "promise/no-return-wrap | The JavaScript Oxidation Compiler"
+source_url: "https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap"
+fetched_at: "2025-12-31T10:44:14.234719+00:00"
+---
+
+
+
+Are you an LLM? You can read better optimized documentation at /docs/guide/usage/linter/rules/promise/no-return-wrap.md for this page in Markdown format
+
+# promise/no-return-wrap Style [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#promise-no-return-wrap)
+
+🚧 An auto-fix is planned for this rule, but not implemented at this time.
+
+### What it does [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#what-it-does)
+
+Prevents unnecessary wrapping of return values in promises with either `Promise.resolve` or `Promise.reject`.
+
+This rule enforces the following stances:
+
+1. When a promise is to be resolved, instead of returning `Promise.resolve(value)` it is better to return the raw value with `return value` instead.
+2. When a promise is to be rejected, instead of returning `Promise.reject(error)`, instead the raw error value should be thrown as in `throw error`.
+
+There is an option to turn off the enforcing of 2, see the options section below.
+
+### Why is this bad? [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#why-is-this-bad)
+
+It is unnecessary to use `Promise.resolve` and `Promise.reject` for converting raw values to promises in the return statements of `then` and `catch` callbacks. Using these operations to convert raw values to promises is unnecessary as simply returning the raw value for the success case and throwing the raw error value in the failure case have the same effect. This is why some take the opinion that returning values such as `Promise.resolve(1)` or `Promise.reject(err)` is syntactic noise.
+
+### Examples [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#examples)
+
+Examples of **incorrect** code for this rule:
+
+js
+
+```
+myPromise().then(() => Promise.resolve(4));
+myPromise().then(function () {
+  return Promise.resolve(4);
+});
+
+myPromise().then(() => Promise.reject("err"));
+myPromise().then(function () {
+  return Promise.reject("err");
+});
+```
+
+js
+
+```
+myPromise().catch(function () {
+  return Promise.reject("err");
+});
+```
+
+js
+
+```
+myPromise().finally(function () {
+  return Promise.reject("err");
+});
+```
+
+js
+
+```
+myPromise().finally(() => Promise.resolve(4));
+```
+
+Examples of **correct** code for this rule:
+
+js
+
+```
+myPromise().then(() => 4);
+myPromise().then(function () {
+  return 4;
+});
+
+myPromise().then(() => throw "err");
+myPromise().then(function () {
+  throw "err";
+});
+```
+
+js
+
+```
+myPromise().catch(function () {
+  throw "err";
+});
+```
+
+js
+
+```
+myPromise().finally(() => 4);
+```
+
+## Configuration [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#configuration)
+
+This rule accepts a configuration object with the following properties:
+
+### allowReject [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#allowreject)
+
+type: `boolean`
+
+default: `false`
+
+`allowReject` allows returning `Promise.reject` inside a promise handler.
+
+With `allowReject` set to `true` the following are examples of correct code:
+
+js
+
+```
+myPromise().then(function () {
+  return Promise.reject(0);
+});
+```
+
+js
+
+```
+myPromise()
+  .then()
+  .catch(() => Promise.reject("err"));
+```
+
+## How to use [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#how-to-use)
+
+To **enable** this rule using the config file or in the CLI, you can use:
+
+Config (.oxlintrc.json)CLI
+
+json
+
+```
+{
+  "plugins": ["promise"],
+  "rules": {
+    "promise/no-return-wrap": "error"
+  }
+}
+```
+
+bash
+
+```
+oxlint --deny promise/no-return-wrap --promise-plugin
+```
+
+## References [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/no-return-wrap.html#references)
+
+* [Rule Source](https://github.com/oxc-project/oxc/blob/1bf0ffc0f6859c90409a9701e62e8957ef1286cc/crates/oxc_linter/src/rules/promise/no_return_wrap.rs)

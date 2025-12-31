@@ -46,6 +46,8 @@ type Recorder struct {
 		config.Config
 		enableStationIDMap map[string]struct{}
 	}
+
+	adHocManager *AdHocTaskManager
 }
 
 func NewRecorder(
@@ -80,10 +82,21 @@ func NewRecorder(
 		radikoEmail:    radikoEmail,
 		radikoPassword: radikoPassword,
 		configFilePath: configFilePath,
+		adHocManager:   NewAdHocTaskManager(),
 	}
 	if _, err := r.refreshConfig(initConfig); err != nil {
 		return nil, errors.Wrap(err, "failed to init config")
 	}
+
+	// タスククリーンアップgoroutine起動
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			r.adHocManager.CleanupOldTasks()
+			logger.Debug().Msg("cleaned up old adhoc tasks")
+		}
+	}()
 
 	return r, nil
 }
@@ -570,4 +583,220 @@ func (r *Recorder) RefreshConfigByURL(configURL string) (config.Config, error) {
 	}
 
 	return r.refreshConfig(config)
+}
+
+// RecordAdHoc はアドホック録音を開始し、タスクIDを返す
+func (r *Recorder) RecordAdHoc(ctx context.Context, stationID string, from time.Time, areaID string) (string, error) {
+	task := r.adHocManager.Create(stationID, from, areaID)
+
+	// 非同期実行
+	go func() {
+		r.executeAdHocRecording(context.Background(), task)
+	}()
+
+	return task.ID, nil
+}
+
+// GetAdHocTaskStatus はタスクIDリストからタスク情報を取得
+func (r *Recorder) GetAdHocTaskStatus(taskIDs []string) []*AdHocTask {
+	return r.adHocManager.List(taskIDs)
+}
+
+func (r *Recorder) executeAdHocRecording(ctx context.Context, task *AdHocTask) {
+	logger := r.logger.With().
+		Str("task_id", task.ID).
+		Str("station_id", task.StationID).
+		Time("from", task.From).
+		Str("area_id", task.AreaID).
+		Logger()
+
+	logger.Info().Msg("adhoc recording started")
+
+	// ステータス更新: recording
+	r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+		t.Status = TaskRecording
+	})
+
+	// エリア指定がある場合、プレミアム認証が必要
+	if task.AreaID != "" && (r.radikoEmail == "" || r.radikoPassword == "") {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = "エリア外録音にはプレミアム認証が必要です"
+		})
+		logger.Error().Msg("area recording requires premium authentication")
+		return
+	}
+
+	// Radikoクライアント初期化（毎回必要！）
+	client, err := radikoutil.NewClient(
+		ctx,
+		radikoutil.WithAreaID(task.AreaID),
+		radikoutil.WithPremium(r.radikoEmail, r.radikoPassword),
+	)
+	if err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to create radiko client")
+		return
+	}
+
+	// 番組情報取得
+	program, err := client.GetProgramByStartTime(ctx, task.StationID, task.From)
+	if err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = fmt.Sprintf("番組が見つかりません: %v", err)
+		})
+		logger.Error().Err(err).Msg("failed to get program")
+		return
+	}
+
+	logger.Info().
+		Str("program_title", program.Title).
+		Str("program_ft", program.Ft).
+		Str("program_to", program.To).
+		Msg("program found")
+
+	// ファイル名生成
+	fileName := fmt.Sprintf(
+		"%s_%s.%s",
+		task.StationID,
+		task.From.Format("20060102150405"),
+		config.AudioFormatAAC,
+	)
+	adhocDir := filepath.Join(r.targetDir, "adhoc")
+	if err := os.MkdirAll(adhocDir, 0755); err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to create adhoc directory")
+		return
+	}
+
+	output := filepath.Join(adhocDir, fileName)
+
+	// ファイル存在チェック（重複許可だが、念のため）
+	if _, err := os.Stat(output); err == nil {
+		logger.Info().Str("output", output).Msg("file already exists, but continuing")
+	}
+
+	// M3U8プレイリスト取得
+	uri, err := client.TimeshiftPlaylistM3U8(ctx, task.StationID, task.From)
+	if err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = fmt.Sprintf("M3U8取得失敗: %v", err)
+		})
+		logger.Error().Err(err).Msg("failed to get m3u8")
+		return
+	}
+
+	// チャンクURL抽出
+	chunkURLs, err := radiko.GetChunklistFromM3U8(uri)
+	if err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to get chunklist")
+		return
+	}
+
+	// 一時ディレクトリ作成
+	aacDir, err := os.MkdirTemp(os.TempDir(), "radicaster-adhoc")
+	if err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to create temp dir")
+		return
+	}
+	defer os.RemoveAll(aacDir)
+	logger.Debug().Str("aac_temp_dir", aacDir).Msg("created temp dir")
+
+	// AACチャンクダウンロード
+	if err := r.bulkDownload(chunkURLs, aacDir); err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to download aac files")
+		return
+	}
+
+	// AACファイル結合
+	logger.Info().Msg("start concating aac files")
+	var concatedFile string
+	if iterCount, _, err := lo.AttemptWithDelay(
+		10,
+		10*time.Second,
+		func(i int, dur time.Duration) error {
+			var err error
+			logger.Info().Dur("duration", dur).Int("iter_count", i).Msg("concating aac files")
+			concatedFile, err = ffmpeg.ConcatAACFilesFromList(ctx, logger, aacDir)
+			if err != nil {
+				logger.Error().
+					Err(err).
+					Str("stack", fmt.Sprintf("%+v", errors.WithStack(err))).
+					Msg("failed to concat aac files")
+				return errors.Wrap(err, "failed to concat aac files")
+			}
+			return nil
+		}); err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = fmt.Sprintf("AAC結合失敗（%d回試行）: %v", iterCount, err)
+		})
+		logger.Error().Err(err).Msg("failed to concat aac files")
+		return
+	}
+	logger.Info().Msg("finished concating aac files")
+
+	// ファイル移動
+	absPath, err := filepath.Abs(output)
+	if err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to get abs path")
+		return
+	}
+	if err := os.Rename(concatedFile, absPath); err != nil {
+		r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+			t.Status = TaskFailed
+			t.Error = err.Error()
+		})
+		logger.Error().Err(err).Msg("failed to rename file")
+		return
+	}
+
+	// メタデータ書き込み（Path="adhoc"）
+	if err := metadata.WriteByAudioFilePath(
+		output,
+		metadata.EpisodeMetadata{
+			Title:        program.Title,
+			Description:  program.Desc,
+			PublishedAt:  task.From,
+			ImageURL:     "",
+			Path:         "adhoc",
+			PodcastTitle: "アドホック録音",
+			ZenrokuMode:  false,
+		},
+	); err != nil {
+		// エラーログのみ、タスクは成功扱い
+		logger.Error().Err(err).Msg("failed to write metadata")
+	}
+
+	// ステータス更新: completed
+	r.adHocManager.Update(task.ID, func(t *AdHocTask) {
+		t.Status = TaskCompleted
+		t.FilePath = output
+	})
+
+	logger.Info().Str("output", output).Msg("adhoc recording completed")
 }

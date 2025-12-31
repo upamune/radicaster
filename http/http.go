@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"path"
 	"strings"
@@ -36,6 +37,7 @@ func NewHTTPHandler(
 	recorder *record.Recorder,
 	targetDir string,
 	basicAuth string,
+	radikoEmail, radikoPassword string,
 ) (http.Handler, error) {
 	e := echo.New()
 	e.Use(middleware.Recover())
@@ -106,7 +108,13 @@ func NewHTTPHandler(
 		)
 	})
 
-	t, err := template.New("config.html.tmpl").
+	// テンプレートエンジン設定
+	renderer := &templateRenderer{
+		templates: make(map[string]*template.Template),
+	}
+
+	// config.html.tmpl
+	configTmpl, err := template.New("config.html.tmpl").
 		Funcs(template.FuncMap{
 			"inc": func(i int) int {
 				return i + 1
@@ -126,8 +134,39 @@ func NewHTTPHandler(
 		}).
 		ParseFS(views, "views/config.html.tmpl")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse template")
+		return nil, errors.Wrap(err, "failed to parse config template")
 	}
+	renderer.templates["config.html.tmpl"] = configTmpl
+
+	// programs.html.tmpl
+	programsTmpl, err := template.ParseFS(views, "views/programs.html.tmpl")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse programs template")
+	}
+	renderer.templates["programs.html.tmpl"] = programsTmpl
+
+	e.Renderer = renderer
+
+	// 番組表キャッシュ
+	programCache := newProgramCacheStore(5 * time.Minute)
+
+	// 番組表UI
+	e.GET("/programs", handlePrograms(
+		radikoEmail,
+		radikoPassword,
+		programCache,
+	))
+
+	// 番組表API
+	e.GET("/api/programs", handleGetPrograms(
+		radikoEmail,
+		radikoPassword,
+		programCache,
+	))
+
+	// アドホック録音API
+	e.POST("/api/record/adhoc", handleAdHocRecord(recorder))
+	e.GET("/api/record/status", handleAdHocStatus(recorder))
 
 	radikoCache := ttlcache.New[string, radiko.Stations](
 		ttlcache.WithTTL[string, radiko.Stations](24 * time.Hour),
@@ -206,20 +245,13 @@ func NewHTTPHandler(
 			}
 		}
 
-		var buf bytes.Buffer
-		if err := t.Execute(
-			&buf,
-			map[string]interface{}{
-				"Programs":        config.Programs,
-				"Zenroku":         config.Zenroku,
-				"ZenrokuStations": zenrokuStations,
-				"Version":         version,
-				"Revision":        revision,
-			},
-		); err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		return c.HTML(http.StatusOK, buf.String())
+		return c.Render(http.StatusOK, "config.html.tmpl", map[string]interface{}{
+			"Programs":        config.Programs,
+			"Zenroku":         config.Zenroku,
+			"ZenrokuStations": zenrokuStations,
+			"Version":         version,
+			"Revision":        revision,
+		})
 	})
 
 	e.PUT("/config", func(ctx echo.Context) error {
@@ -265,4 +297,17 @@ func NewHTTPHandler(
 	e.Static("/static", targetDir)
 
 	return e, nil
+}
+
+// templateRenderer はカスタムテンプレートレンダラー
+type templateRenderer struct {
+	templates map[string]*template.Template
+}
+
+func (t *templateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	tmpl, ok := t.templates[name]
+	if !ok {
+		return errors.Errorf("template not found: %s", name)
+	}
+	return tmpl.Execute(w, data)
 }

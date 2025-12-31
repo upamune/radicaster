@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>番組表 - Radicaster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">番組表</h1>
+            <div class="flex flex-wrap gap-4 mb-4">
+                <div class="flex-1 min-w-[200px]">
+                    <label for="date-select" class="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                    <input
+                        type="date"
+                        id="date-select"
+                        name="date"
+                        value="{{.CurrentDate}}"
+                        hx-get="/api/programs"
+                        hx-target="#program-table"
+                        hx-include="[name='area_id']"
+                        hx-trigger="change"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                {{if .IsPremium}}
+                <div class="flex-1 min-w-[200px]">
+                    <label for="area-select" class="block text-sm font-medium text-gray-700 mb-1">エリア</label>
+                    <select
+                        id="area-select"
+                        name="area_id"
+                        hx-get="/api/programs"
+                        hx-target="#program-table"
+                        hx-include="[name='date']"
+                        hx-trigger="change"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">現在地</option>
+                        <option value="JP13" {{if eq .AreaID "JP13"}}selected{{end}}>東京</option>
+                        <option value="JP27" {{if eq .AreaID "JP27"}}selected{{end}}>大阪</option>
+                        <option value="JP23" {{if eq .AreaID "JP23"}}selected{{end}}>愛知</option>
+                        <option value="JP01" {{if eq .AreaID "JP01"}}selected{{end}}>北海道</option>
+                        <option value="JP40" {{if eq .AreaID "JP40"}}selected{{end}}>福岡</option>
+                    </select>
+                </div>
+                {{end}}
+            </div>
+            <div class="flex gap-4">
+                <a href="/config" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    設定画面へ
+                </a>
+                <a href="/adhoc/rss.xml" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    アドホック録音RSS
+                </a>
+            </div>
+        </header>
+
+        <main>
+            <section class="mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-gray-900">番組一覧</h2>
+                    <div class="flex-1 max-w-md ml-4">
+                        <input
+                            type="text"
+                            id="program-filter"
+                            placeholder="番組名またはステーション名で検索..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            oninput="filterPrograms(this.value)">
+                    </div>
+                </div>
+                <div
+                    id="program-table"
+                    hx-get="/api/programs?date={{.CurrentDate}}&area_id={{.AreaID}}"
+                    hx-trigger="load"
+                    hx-swap="innerHTML">
+                    <div class="flex justify-center items-center py-12">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mb-4">録音タスク</h2>
+                <div
+                    id="task-list"
+                    hx-get="/api/record/status"
+                    hx-trigger="load, every 5s, taskCreated from:body"
+                    hx-swap="innerHTML">
+                    <div class="text-center text-gray-500 py-8">読み込み中...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="mt-12 pt-8 border-t border-gray-200">
+            <p class="text-center text-gray-500 text-sm">
+                Radicaster - Radiko Podcast Recorder
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function filterPrograms(query) {
+            const rows = document.querySelectorAll('.program-row');
+            const lowerQuery = query.toLowerCase();
+
+            rows.forEach(row => {
+                const title = row.dataset.title.toLowerCase();
+                const station = row.dataset.station.toLowerCase();
+
+                if (title.includes(lowerQuery) || station.includes(lowerQuery)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

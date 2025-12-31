@@ -1,0 +1,174 @@
+---
+title: "typescript/switch-exhaustiveness-check | The JavaScript Oxidation Compiler"
+source_url: "https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check"
+fetched_at: "2025-12-31T10:44:14.234719+00:00"
+---
+
+
+
+Are you an LLM? You can read better optimized documentation at /docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.md for this page in Markdown format
+
+# typescript/switch-exhaustiveness-check Pedantic [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#typescript-switch-exhaustiveness-check)
+
+💭 This rule requires [type information](https://oxc.rs/docs/guide/usage/linter/type-aware.html).
+
+🚧 An auto-fix is planned for this rule, but not implemented at this time.
+
+### What it does [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#what-it-does)
+
+This rule requires switch statements to be exhaustive when switching on union types.
+
+### Why is this bad? [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#why-is-this-bad)
+
+When switching on a union type, it's important to handle all possible cases to avoid runtime errors. TypeScript can help ensure exhaustiveness, but only if the switch statement is properly structured with a default case that TypeScript can analyze.
+
+### Examples [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#examples)
+
+Examples of **incorrect** code for this rule:
+
+ts
+
+```
+type Status = "pending" | "approved" | "rejected";
+
+function handleStatus(status: Status) {
+  switch (status) {
+    case "pending":
+      return "Waiting for approval";
+    case "approved":
+      return "Request approved";
+    // Missing 'rejected' case
+  }
+}
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+function getColorName(color: Color) {
+  switch (color) {
+    case Color.Red:
+      return "red";
+    case Color.Green:
+      return "green";
+    // Missing Color.Blue case
+  }
+}
+```
+
+Examples of **correct** code for this rule:
+
+ts
+
+```
+type Status = "pending" | "approved" | "rejected";
+
+function handleStatus(status: Status) {
+  switch (status) {
+    case "pending":
+      return "Waiting for approval";
+    case "approved":
+      return "Request approved";
+    case "rejected":
+      return "Request rejected";
+  }
+}
+
+// Or with default case for exhaustiveness checking
+function handleStatusWithDefault(status: Status) {
+  switch (status) {
+    case "pending":
+      return "Waiting for approval";
+    case "approved":
+      return "Request approved";
+    case "rejected":
+      return "Request rejected";
+    default:
+      const _exhaustiveCheck: never = status;
+      return _exhaustiveCheck;
+  }
+}
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+function getColorName(color: Color) {
+  switch (color) {
+    case Color.Red:
+      return "red";
+    case Color.Green:
+      return "green";
+    case Color.Blue:
+      return "blue";
+    default:
+      const _exhaustiveCheck: never = color;
+      return _exhaustiveCheck;
+  }
+}
+```
+
+## Configuration [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#configuration)
+
+This rule accepts a configuration object with the following properties:
+
+### allowDefaultCaseForExhaustiveSwitch [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#allowdefaultcaseforexhaustiveswitch)
+
+type: `boolean`
+
+default: `true`
+
+Whether to allow default cases on switches that are not exhaustive. When false, requires exhaustive switch statements without default cases.
+
+### considerDefaultExhaustiveForUnions [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#considerdefaultexhaustiveforunions)
+
+type: `boolean`
+
+default: `false`
+
+Whether to consider `default` cases exhaustive for union types. When true, a switch statement with a `default` case is considered exhaustive even if not all union members are handled explicitly.
+
+### defaultCaseCommentPattern [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#defaultcasecommentpattern)
+
+type: `string | null`
+
+Regular expression pattern that when matched in a default case comment, will suppress the exhaustiveness check. Example: `"@skip-exhaustive-check"` to allow `default: // @skip-exhaustive-check`
+
+### requireDefaultForNonUnion [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#requiredefaultfornonunion)
+
+type: `boolean`
+
+default: `false`
+
+Whether to require default cases on switches over union types that are not exhaustive. When true, switches with non-exhaustive union types must have a default case.
+
+## How to use [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#how-to-use)
+
+To **enable** this rule using the config file or in the CLI, you can use:
+
+Config (.oxlintrc.json)CLI
+
+json
+
+```
+{
+  "rules": {
+    "typescript/switch-exhaustiveness-check": "error"
+  }
+}
+```
+
+bash
+
+```
+oxlint --type-aware --deny typescript/switch-exhaustiveness-check
+```
+
+## References [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/switch-exhaustiveness-check.html#references)
+
+* [Rule Source](https://github.com/oxc-project/oxc/blob/1bf0ffc0f6859c90409a9701e62e8957ef1286cc/crates/oxc_linter/src/rules/typescript/switch_exhaustiveness_check.rs)
+* [Rule Source (tsgolint)](https://github.com/oxc-project/tsgolint/blob/main/internal/rules/switch_exhaustiveness_check/switch_exhaustiveness_check.go)

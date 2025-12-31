@@ -1,0 +1,222 @@
+---
+title: "typescript/restrict-template-expressions | The JavaScript Oxidation Compiler"
+source_url: "https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions"
+fetched_at: "2025-12-31T10:44:14.234719+00:00"
+---
+
+
+
+Are you an LLM? You can read better optimized documentation at /docs/guide/usage/linter/rules/typescript/restrict-template-expressions.md for this page in Markdown format
+
+# typescript/restrict-template-expressions Correctness [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#typescript-restrict-template-expressions)
+
+✅ This rule is turned on by default when type-aware linting is enabled.
+
+💭 This rule requires [type information](https://oxc.rs/docs/guide/usage/linter/type-aware.html).
+
+🚧 An auto-fix is planned for this rule, but not implemented at this time.
+
+### What it does [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#what-it-does)
+
+This rule restricts the types allowed in template literal expressions.
+
+### Why is this bad? [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#why-is-this-bad)
+
+Template literals will call toString() on the interpolated values. Some types don't have meaningful string representations (like objects that become "[object Object]") or may not have a toString method at all. This rule helps ensure that only appropriate types are used in template expressions.
+
+### Examples [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#examples)
+
+Examples of **incorrect** code for this rule:
+
+ts
+
+```
+declare const obj: object;
+declare const sym: symbol;
+declare const fn: () => void;
+declare const arr: unknown[];
+
+// Objects become "[object Object]"
+const str1 = `Value: ${obj}`;
+
+// Symbols might not be what you expect
+const str2 = `Symbol: ${sym}`;
+
+// Functions become their source code or "[Function]"
+const str3 = `Function: ${fn}`;
+
+// Arrays might not format as expected
+const str4 = `Array: ${arr}`;
+
+// undefined/null become "undefined"/"null" which might be confusing
+declare const maybeValue: string | undefined;
+const str5 = `Value: ${maybeValue}`; // Could be "Value: undefined"
+```
+
+Examples of **correct** code for this rule:
+
+ts
+
+```
+declare const str: string;
+declare const num: number;
+declare const bool: boolean;
+declare const obj: object;
+
+// Safe types
+const result1 = `String: ${str}`;
+const result2 = `Number: ${num}`;
+const result3 = `Boolean: ${bool}`;
+
+// Explicit conversions for complex types
+const result4 = `Object: ${JSON.stringify(obj)}`;
+const result5 = `Array: ${arr.join(", ")}`;
+
+// Handle undefined/null explicitly
+declare const maybeValue: string | undefined;
+const result6 = `Value: ${maybeValue ?? "N/A"}`;
+const result7 = `Value: ${maybeValue || "default"}`;
+
+// Type guards for unknown values
+declare const unknown: unknown;
+const result8 = typeof unknown === "string" ? `Value: ${unknown}` : "Invalid";
+```
+
+## Configuration [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#configuration)
+
+This rule accepts a configuration object with the following properties:
+
+### allow [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allow)
+
+type: `array`
+
+default: `[{"from":"lib", "name":["Error", "URL", "URLSearchParams"]}]`
+
+An array of type or value specifiers for additional types that are allowed in template expressions. Defaults include Error, URL, and URLSearchParams from lib.
+
+#### allow[n] [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allow-n)
+
+type: `string`
+
+Type or value specifier for matching specific declarations
+
+Supports four types of specifiers:
+
+1. **String specifier** (deprecated): Universal match by name
+
+json
+
+```
+"Promise"
+```
+
+2. **File specifier**: Match types/values declared in local files
+
+json
+
+```
+{ "from": "file", "name": "MyType" }
+{ "from": "file", "name": ["Type1", "Type2"] }
+{ "from": "file", "name": "MyType", "path": "./types.ts" }
+```
+
+3. **Lib specifier**: Match TypeScript built-in lib types
+
+json
+
+```
+{ "from": "lib", "name": "Promise" }
+{ "from": "lib", "name": ["Promise", "PromiseLike"] }
+```
+
+4. **Package specifier**: Match types/values from npm packages
+
+json
+
+```
+{ "from": "package", "name": "Observable", "package": "rxjs" }
+{ "from": "package", "name": ["Observable", "Subject"], "package": "rxjs" }
+```
+
+### allowAny [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allowany)
+
+type: `boolean`
+
+default: `true`
+
+Whether to allow `any` typed values in template expressions.
+
+### allowArray [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allowarray)
+
+type: `boolean`
+
+default: `false`
+
+Whether to allow array types in template expressions.
+
+### allowBoolean [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allowboolean)
+
+type: `boolean`
+
+default: `true`
+
+Whether to allow boolean types in template expressions.
+
+### allowNever [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allownever)
+
+type: `boolean`
+
+default: `false`
+
+Whether to allow `never` type in template expressions.
+
+### allowNullish [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allownullish)
+
+type: `boolean`
+
+default: `true`
+
+Whether to allow nullish types (`null` or `undefined`) in template expressions.
+
+### allowNumber [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allownumber)
+
+type: `boolean`
+
+default: `true`
+
+Whether to allow number and bigint types in template expressions.
+
+### allowRegExp [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#allowregexp)
+
+type: `boolean`
+
+default: `true`
+
+Whether to allow RegExp values in template expressions.
+
+## How to use [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#how-to-use)
+
+To **enable** this rule using the config file or in the CLI, you can use:
+
+Config (.oxlintrc.json)CLI
+
+json
+
+```
+{
+  "rules": {
+    "typescript/restrict-template-expressions": "error"
+  }
+}
+```
+
+bash
+
+```
+oxlint --type-aware --deny typescript/restrict-template-expressions
+```
+
+## References [​](https://oxc.rs/docs/guide/usage/linter/rules/typescript/restrict-template-expressions.html#references)
+
+* [Rule Source](https://github.com/oxc-project/oxc/blob/1bf0ffc0f6859c90409a9701e62e8957ef1286cc/crates/oxc_linter/src/rules/typescript/restrict_template_expressions.rs)
+* [Rule Source (tsgolint)](https://github.com/oxc-project/tsgolint/blob/main/internal/rules/restrict_template_expressions/restrict_template_expressions.go)

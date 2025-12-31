@@ -1,119 +1,196 @@
-<html>
-    <head>
-        <title>Radicaster - Config</title>
-        <link rel="stylesheet" href="https://unpkg.com/awsm.css/dist/awsm.min.css">
-    </head>
-    <body>
-        <header>
-            <h2>Config</h2>
-            <p>version: {{ .Version }}</p>
-            <p>commit: {{ .Revision }}</p>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>設定 - Radicaster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">設定</h1>
+                    <div class="flex gap-4 mt-2 text-sm text-gray-600">
+                        <span>バージョン: {{ .Version }}</span>
+                        <span>コミット: {{ .Revision }}</span>
+                    </div>
+                </div>
+                <a href="/programs" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    番組表を開く
+                </a>
+            </div>
         </header>
-        <main>
-            <article>
-                <h3>Programs</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">Index</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Title</th>
-                            <th scope="col">Cron</th>
-                            <th scope="col">Area</th>
-                            <th scope="col">Station</th>
-                            <th scope="col">Start</th>
-                            <th scope="col">Encoding</th>
-                            <th scope="col">Path</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>All</td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td>-</td>
-                          <td><a href="/all/rss.xml">/all</a></td>
-                        </tr>
-                        {{ range $i, $p := .Programs }}
-                        <tr>
-                          <td>{{ inc $i }}</td>
-                          <td>
-                          {{ if ne $p.ImageURL "" }}
-                            <img src="{{ $p.ImageURL }}" width="100px" />
-                          {{ else }}
-                            -
-                          {{ end }}
-                          </td>
-                          <td>{{ $p.Title }}</td>
-                          <td>{{ $p.Cron }}</td>
-                          <td>
-                          {{ if ne $p.AreaID "" }}
-                            {{ $p.AreaID }}
-                          {{ else }}
-                            -
-                          {{ end }}
-                          </td>
-                          <td>{{ $p.StationID }}</td>
-                          <td>{{ $p.Start }}</td>
-                          <td>{{ $p.Encoding }}</td>
-                          <td><a href="{{ if ne $p.Path "" }}/{{ $p.Path }}/rss.xml{{ else }}/rss.xml{{ end }}">/{{ $p.Path }}</a></td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
-                <h3>Zenroku</h3>
-                <ul>
-                    <li>Enable: {{ .Zenroku.Enable }}</li>
-                    {{ if .Zenroku.Enable }}
-                        <li>Cron: {{ .Zenroku.Cron }}</li>
-                        <li>Encoding: {{ .Zenroku.Encoding }}</li>
-                    {{ end }}
-                </ul>
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col">Index</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">ID</th>
-                            <th scope="col">Name</th>
-                            <th scope="col">Enabled</th>
-                            <th scope="col">Path</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{ range $i, $s := .ZenrokuStations }}
-                        <tr>
-                          <td>{{ inc $i }}</td>
-                          <td>
-                          {{ if ne $s.ImageURL "" }}
-                            <img src="{{ $s.ImageURL }}" width="100px" />
-                          {{ end }}
-                          </td>
-                          <td>{{ $s.ID }}</td>
-                          <td>{{ $s.Name }}</td>
-                          <td>
-                          {{ if $s.Enabled }}
-                          ✅
-                          {{ else }}
-                          -
-                          {{ end }}
-                          </td>
-                          <td>
-                            {{ if $s.Enabled }}
-                                <a href="{{ $s.Path }}/rss.xml">{{ $s.Path }}</a>
-                            {{ else }}
-                                -
+
+        <main class="space-y-8">
+            <!-- Programs Section -->
+            <section class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-2xl font-semibold text-gray-900 mb-4">番組指定録音</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">画像</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">番組名</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cron</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">エリア</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ステーション</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">開始時刻</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">形式</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RSS</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-900">全エピソード</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">-</td>
+                                <td class="px-4 py-3 text-sm">
+                                    <a href="/all/rss.xml" class="text-blue-600 hover:text-blue-800 hover:underline">/all</a>
+                                </td>
+                            </tr>
+                            {{ range $i, $p := .Programs }}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm text-gray-900">{{ inc $i }}</td>
+                                <td class="px-4 py-3">
+                                    {{ if ne $p.ImageURL "" }}
+                                    <img src="{{ $p.ImageURL }}" alt="{{ $p.Title }}" class="w-16 h-16 object-cover rounded" />
+                                    {{ else }}
+                                    <div class="w-16 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                                        No Image
+                                    </div>
+                                    {{ end }}
+                                </td>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $p.Title }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-600 font-mono">{{ $p.Cron }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    {{ if ne $p.AreaID "" }}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        {{ $p.AreaID }}
+                                    </span>
+                                    {{ else }}
+                                    -
+                                    {{ end }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900">{{ $p.StationID }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">{{ $p.Start }}</td>
+                                <td class="px-4 py-3 text-sm">
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        {{ $p.Encoding }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    <a href="{{ if ne $p.Path "" }}/{{ $p.Path }}/rss.xml{{ else }}/rss.xml{{ end }}" class="text-blue-600 hover:text-blue-800 hover:underline">/{{ $p.Path }}</a>
+                                </td>
+                            </tr>
                             {{ end }}
-                          </td>
-                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Zenroku Section -->
+            <section class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-semibold text-gray-900">全録設定</h2>
+                    <div class="flex items-center">
+                        <span class="mr-2 text-sm text-gray-600">状態:</span>
+                        {{ if .Zenroku.Enable }}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            有効
+                        </span>
+                        {{ else }}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                            無効
+                        </span>
                         {{ end }}
-                    </tbody>
-                </table>
-            </article>
+                    </div>
+                </div>
+
+                {{ if .Zenroku.Enable }}
+                <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-600 mb-1">Cronスケジュール</div>
+                        <div class="text-lg font-mono text-gray-900">{{ .Zenroku.Cron }}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-600 mb-1">エンコード形式</div>
+                        <div class="text-lg font-semibold text-gray-900">{{ .Zenroku.Encoding }}</div>
+                    </div>
+                </div>
+                {{ end }}
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">画像</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ステーション名</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状態</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RSS</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {{ range $i, $s := .ZenrokuStations }}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 text-sm text-gray-900">{{ inc $i }}</td>
+                                <td class="px-4 py-3">
+                                    {{ if ne $s.ImageURL "" }}
+                                    <img src="{{ $s.ImageURL }}" alt="{{ $s.Name }}" class="w-16 h-16 object-cover rounded" />
+                                    {{ else }}
+                                    <div class="w-16 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
+                                        No Image
+                                    </div>
+                                    {{ end }}
+                                </td>
+                                <td class="px-4 py-3 text-sm font-mono text-gray-900">{{ $s.ID }}</td>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $s.Name }}</td>
+                                <td class="px-4 py-3">
+                                    {{ if $s.Enabled }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        有効
+                                    </span>
+                                    {{ else }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        無効
+                                    </span>
+                                    {{ end }}
+                                </td>
+                                <td class="px-4 py-3 text-sm">
+                                    {{ if $s.Enabled }}
+                                    <a href="{{ $s.Path }}/rss.xml" class="text-blue-600 hover:text-blue-800 hover:underline">{{ $s.Path }}</a>
+                                    {{ else }}
+                                    -
+                                    {{ end }}
+                                </td>
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </main>
-    </body>
+
+        <footer class="mt-12 pt-8 border-t border-gray-200">
+            <p class="text-center text-gray-500 text-sm">
+                Radicaster - Radiko Podcast Recorder
+            </p>
+        </footer>
+    </div>
+</body>
 </html>

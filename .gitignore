@@ -5,3 +5,5 @@
 *.yaml
 *.aac
 *.mp3
+build/
+

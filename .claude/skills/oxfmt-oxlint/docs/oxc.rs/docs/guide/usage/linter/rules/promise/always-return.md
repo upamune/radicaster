@@ -1,0 +1,182 @@
+---
+title: "promise/always-return | The JavaScript Oxidation Compiler"
+source_url: "https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return"
+fetched_at: "2025-12-31T10:44:14.234719+00:00"
+---
+
+
+
+Are you an LLM? You can read better optimized documentation at /docs/guide/usage/linter/rules/promise/always-return.md for this page in Markdown format
+
+# promise/always-return Suspicious [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#promise-always-return)
+
+### What it does [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#what-it-does)
+
+Require returning inside each `then()` to create readable and reusable Promise chains. We also allow someone to throw inside a `then()` which is essentially the same as return `Promise.reject()`.
+
+### Why is this bad? [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#why-is-this-bad)
+
+Broken Promise Chain. Inside the first `then()` callback, a function is called but not returned. This causes the next `then()` in the chain to execute immediately without waiting for the called function to complete.
+
+### Examples [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#examples)
+
+Examples of **incorrect** code for this rule:
+
+javascript
+
+```
+myPromise.then(function (val) {});
+myPromise.then(() => {
+  doSomething();
+});
+myPromise.then((b) => {
+  if (b) {
+    return "yes";
+  } else {
+    forgotToReturn();
+  }
+});
+```
+
+Examples of **correct** code for this rule:
+
+javascript
+
+```
+myPromise.then((val) => val * 2);
+myPromise.then(function (val) {
+  return val * 2;
+});
+myPromise.then(doSomething); // could be either
+myPromise.then((b) => {
+  if (b) {
+    return "yes";
+  } else {
+    return "no";
+  }
+});
+```
+
+## Configuration [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#configuration)
+
+This rule accepts a configuration object with the following properties:
+
+### ignoreAssignmentVariable [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#ignoreassignmentvariable)
+
+type: `string[]`
+
+default: `["globalThis"]`
+
+You can pass an `{ ignoreAssignmentVariable: [] }` as an option to this rule with a list of variable names so that the last `then()` callback in a promise chain does not warn if it does an assignment to a global variable. Default is `["globalThis"]`.
+
+javascript
+
+```
+/* eslint promise/always-return: ["error", { ignoreAssignmentVariable: ["globalThis"] }] */
+
+// OK
+promise.then((x) => {
+  globalThis = x;
+});
+
+promise.then((x) => {
+  globalThis.x = x;
+});
+
+// OK
+promise.then((x) => {
+  globalThis.x.y = x;
+});
+
+// NG
+promise.then((x) => {
+  anyOtherVariable = x;
+});
+
+// NG
+promise.then((x) => {
+  anyOtherVariable.x = x;
+});
+
+// NG
+promise.then((x) => {
+  x();
+});
+```
+
+### ignoreLastCallback [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#ignorelastcallback)
+
+type: `boolean`
+
+default: `false`
+
+You can pass an `{ ignoreLastCallback: true }` as an option to this rule so that the last `then()` callback in a promise chain does not warn if it does not have a `return`. Default is `false`.
+
+javascript
+
+```
+// OK
+promise.then((x) => {
+  console.log(x);
+});
+// OK
+void promise.then((x) => {
+  console.log(x);
+});
+// OK
+await promise.then((x) => {
+  console.log(x);
+});
+
+promise
+  // NG
+  .then((x) => {
+    console.log(x);
+  })
+  // OK
+  .then((x) => {
+    console.log(x);
+  });
+
+// NG
+const v = promise.then((x) => {
+  console.log(x);
+});
+// NG
+const v = await promise.then((x) => {
+  console.log(x);
+});
+function foo() {
+  // NG
+  return promise.then((x) => {
+    console.log(x);
+  });
+}
+```
+
+## How to use [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#how-to-use)
+
+To **enable** this rule using the config file or in the CLI, you can use:
+
+Config (.oxlintrc.json)CLI
+
+json
+
+```
+{
+  "plugins": ["promise"],
+  "rules": {
+    "promise/always-return": "error"
+  }
+}
+```
+
+bash
+
+```
+oxlint --deny promise/always-return --promise-plugin
+```
+
+## References [​](https://oxc.rs/docs/guide/usage/linter/rules/promise/always-return.html#references)
+
+* [Rule Source](https://github.com/oxc-project/oxc/blob/1bf0ffc0f6859c90409a9701e62e8957ef1286cc/crates/oxc_linter/src/rules/promise/always_return.rs)

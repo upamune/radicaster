@@ -1,0 +1,106 @@
+---
+title: "react/no-string-refs | The JavaScript Oxidation Compiler"
+source_url: "https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs"
+fetched_at: "2025-12-31T10:44:14.234719+00:00"
+---
+
+
+
+Are you an LLM? You can read better optimized documentation at /docs/guide/usage/linter/rules/react/no-string-refs.md for this page in Markdown format
+
+# react/no-string-refs Correctness [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#react-no-string-refs)
+
+### What it does [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#what-it-does)
+
+This rule prevents using string literals in ref attributes.
+
+### Why is this bad? [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#why-is-this-bad)
+
+Using string literals in ref attributes is deprecated in React.
+
+### Examples [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#examples)
+
+Examples of **incorrect** code for this rule:
+
+jsx
+
+```
+var Hello = createReactClass({
+  render: function () {
+    return <div ref="hello">Hello, world.</div>;
+  },
+});
+
+var Hello = createReactClass({
+  componentDidMount: function () {
+    var component = this.refs.hello;
+    // ...do something with component
+  },
+  render: function () {
+    return <div ref="hello">Hello, world.</div>;
+  },
+});
+```
+
+Examples of **correct** code for this rule:
+
+jsx
+
+```
+var Hello = createReactClass({
+  componentDidMount: function () {
+    var component = this.hello;
+    // ...do something with component
+  },
+  render() {
+    return (
+      <div
+        ref={(c) => {
+          this.hello = c;
+        }}
+      >
+        Hello, world.
+      </div>
+    );
+  },
+});
+```
+
+## Configuration [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#configuration)
+
+This rule accepts a configuration object with the following properties:
+
+### noTemplateLiterals [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#notemplateliterals)
+
+type: `boolean`
+
+default: `false`
+
+Disallow template literals in addition to string literals.
+
+## How to use [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#how-to-use)
+
+To **enable** this rule using the config file or in the CLI, you can use:
+
+Config (.oxlintrc.json)CLI
+
+json
+
+```
+{
+  "plugins": ["react"],
+  "rules": {
+    "react/no-string-refs": "error"
+  }
+}
+```
+
+bash
+
+```
+oxlint --deny react/no-string-refs --react-plugin
+```
+
+## References [​](https://oxc.rs/docs/guide/usage/linter/rules/react/no-string-refs.html#references)
+
+* [Rule Source](https://github.com/oxc-project/oxc/blob/1bf0ffc0f6859c90409a9701e62e8957ef1286cc/crates/oxc_linter/src/rules/react/no_string_refs.rs)

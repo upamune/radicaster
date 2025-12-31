@@ -154,7 +154,17 @@ func realMain() int {
 		return 1
 	}
 
-	handler, err := http.NewHTTPHandler(logger, Version, Revision, podcaster, recorder, *targetDir, *basicAuth)
+	handler, err := http.NewHTTPHandler(
+		logger,
+		Version,
+		Revision,
+		podcaster,
+		recorder,
+		*targetDir,
+		*basicAuth,
+		lo.FromPtr(radikoEmail),
+		lo.FromPtr(radikoPassword),
+	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create HTTP handler")
 		return 1
