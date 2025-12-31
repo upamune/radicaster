@@ -131,6 +131,13 @@ func handleAdHocRecord(recorder *record.Recorder) echo.HandlerFunc {
 			})
 		}
 
+		if fromTime.After(time.Now()) {
+			c.Logger().Warnf("attempt to record future program: %s", fromTime)
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+				"error": "未来の番組は録音できません。過去に放送された番組のみ録音可能です。",
+			})
+		}
+
 		taskID, err := recorder.RecordAdHoc(
 			c.Request().Context(),
 			req.StationID,
@@ -199,6 +206,7 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 						{{formatTime .Ft}} - {{formatTime .To}}
 					</td>
 					<td class="px-4 py-2 border text-center">
+						{{if isPast .Ft}}
 						<button
 							hx-post="/api/record/adhoc"
 							hx-vals='{"station_id": "{{$station.StationID}}", "from": "{{.Ft}}", "area_id": "{{$station.AreaID}}"}'
@@ -207,6 +215,14 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 							class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm">
 							録音
 						</button>
+						{{else}}
+						<button
+							disabled
+							class="bg-gray-300 text-gray-500 font-bold py-1 px-3 rounded text-sm cursor-not-allowed"
+							title="未来の番組は録音できません">
+							録音不可
+						</button>
+						{{end}}
 					</td>
 				</tr>
 				{{end}}
@@ -228,6 +244,14 @@ func renderProgramTable(c echo.Context, stations radiko.Stations, areaID string,
 		},
 		"stripHTML": func(s string) string {
 			return strictPolicy.Sanitize(s)
+		},
+		"isPast": func(timeStr string) bool {
+			// YYYYMMDDhhmmss 形式をパースして過去かどうかを判定
+			t, err := time.Parse("20060102150405", timeStr)
+			if err != nil {
+				return false
+			}
+			return t.Before(time.Now())
 		},
 	}
 
