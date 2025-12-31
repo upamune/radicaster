@@ -394,6 +394,27 @@ func (p *Podcaster) Sync() error {
 	p.logger.Trace().Str("all_feed", feed).Msg("all episodes feed is generated")
 	feedMap["all"] = feed
 
+	// adhoc パスの空のフィードを初期化（録音ファイルがなくてもRSSフィードが存在するように）
+	if _, exists := feedMap["adhoc"]; !exists {
+		adhocEpisodes := pathGroupedEpisodes["adhoc"]
+		if adhocEpisodes == nil {
+			adhocEpisodes = []Episode{}
+		}
+		adhocFeed, err := encodePodcastToXML(
+			&Podcast{
+				Title:       "Radicaster - アドホック録音",
+				Link:        p.link,
+				Description: "番組表から手動で録音した番組",
+				PublishedAt: p.publishedAt,
+				ImageURL:    p.imageURL,
+				Episodes:    adhocEpisodes,
+			},
+		)
+		if err == nil {
+			feedMap["adhoc"] = adhocFeed
+		}
+	}
+
 	p.mu.Lock()
 	p.feedMap = feedMap
 	p.pathGroupedEpisodes = pathGroupedEpisodes
