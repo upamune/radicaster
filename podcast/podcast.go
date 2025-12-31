@@ -264,13 +264,19 @@ func (p *Podcaster) Sync() error {
 			return nil
 		}
 
+		// targetDir からの相対パスを取得（サブディレクトリを含む）
+		relPath, err := filepath.Rel(p.targetDir, fpath)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
 		baseName := filepath.Base(fpath)
 
 		u, err := url.Parse(p.baseURL)
 		if err != nil {
 			return fmt.Errorf("failed to parse baseURL(%s): %w", p.baseURL, err)
 		}
-		u.Path = path.Join(u.Path, "static", baseName)
+		// path.Join を使ってパスを結合（forward slash を使用）
+		u.Path = path.Join(u.Path, "static", filepath.ToSlash(relPath))
 
 		stat, err := os.Stat(fpath)
 		if err != nil {
