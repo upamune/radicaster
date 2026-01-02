@@ -2,8 +2,21 @@
 /output
 /tmp
 .DS_Store
-*.yaml
+
+# 設定ファイル（サンプルは除外）
+radicaster.yaml
+!radicaster.yaml.example
+
+# 認証情報
+radiko_password
+radiko_email
+.env
+.env.local
+*.local.yaml
+
+# メディアファイル
 *.aac
 *.mp3
+
 build/
 

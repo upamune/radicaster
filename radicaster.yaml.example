@@ -1,0 +1,32 @@
+# radicaster 設定ファイルのサンプル
+# このファイルを radicaster.yaml にコピーして使用してください
+# cp radicaster.yaml.example radicaster.yaml
+
+# 録音する番組のリスト
+programs:
+  - name: "サンプル番組"
+    station: "TBS"
+    cron: "0 22 * * MON-FRI"  # 月-金の22:00に録音
+    # areaId: "JP13"  # オプション: エリア外の番組を録音する場合に指定（Radikoプレミアム必須）
+
+# 全録設定（オプション）
+zenroku:
+  enable: false
+  cron: ""
+  encoding: ""
+  stations: {}
+  enable_stations: []
+
+# Radikoプレミアム認証について
+# 認証情報は以下の方法で指定できます：
+#
+# 1. コマンドライン引数（推奨）
+#    radicaster -radikoemail "your-email@example.com" -radikopassword "your-password" -config ./radicaster.yaml
+#
+# 2. ファイルから読み込み
+#    echo "your-password" > radiko_password
+#    chmod 600 radiko_password
+#    radicaster -radikopassword "$(cat radiko_password)" -config ./radicaster.yaml
+#
+# ⚠️ セキュリティ警告: 認証情報をこのファイルや Git に含めないでください
+
